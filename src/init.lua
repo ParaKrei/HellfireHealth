@@ -483,58 +483,74 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 			end
 		elseif arg1:lower() == "maxhealth" and isAdmin then
 			if arg2 ~= nil then
-				if tonumber(arg3) ~= nil then
-					for target in players.iterate() do
-						if target.name == arg2 then
-							target.hellfireHealth.maxHealth = tonumber(arg3)
+				if arg3 ~= nil then
+					if tonumber(arg3) ~= nil then
+						if tonumber(arg3) > 0 and tonumber(arg3) < 50 then
+							for target in players.iterate() do
+								if target.name == arg2 then
+									target.hellfireHealth.maxHealth = tonumber(arg3)
 
-							target.hellfireHealth.health = target.hellfireHealth.maxHealth
-							target.hellfireHealth.curRing = target.hellfireHealth.maxHealth-1
+									target.hellfireHealth.health = target.hellfireHealth.maxHealth
+									target.hellfireHealth.curRing = target.hellfireHealth.maxHealth-1
 
-							resetRings(target.hellfireHealth)
-							CONS_Printf(target, "\x8B\bAdministrator \x86"..ply.name.."\x80 has changed your max health to \x82"..arg3.."\x80.")
-							CONS_Printf(target, "Your health has been refilled and changed to reflect this new setting.")
+									resetRings(target.hellfireHealth)
+									CONS_Printf(target, "\x8B\bAdministrator \x86"..ply.name.."\x80 has changed your max health to \x82"..arg3.."\x80.")
+									CONS_Printf(target, "Your health has been refilled and changed to reflect this new setting.")
 
-							if arg4 ~= nil then
-								CONS_Printf(target, "\x85They also left you a message:\x82\n"..arg4)
+									if arg4 ~= nil then
+										CONS_Printf(target, "\x85They also left you a message:\x82\n"..arg4)
+									end
+
+									CONS_Printf(ply, "You set \x85"..arg2.."\x80\b's max health to \x82"..tostring(target.hellfireHealth.maxHealth).."\x80.")
+
+									return
+								end
 							end
-
-							CONS_Printf(ply, "You set \x85"..arg2.."\x80\b's max health to \x82"..tostring(target.hellfireHealth.maxHealth).."\x80.")
-
-							return
+						else
+							CONS_Printf(ply, "\x85\bThe value \""..arg3.."\" is out of range!")
 						end
+					else
+						CONS_Printf(ply, "\x85\bThe value \""..arg3.."\" is NOT a number!")
 					end
 				else
-					CONS_Printf(ply, "\x85\bThe value \""..arg3.."\" is NOT a number!")
+					CONS_Printf(ply, "\x85\bYou need a value!")
 				end
 			else
 				CONS_Printf(ply, "\x85\bYou need to put in a player's name to use this command!\nIf you want to change EVERYONE's max health, use the cvar instead.")
 			end
 		elseif arg1:lower() == "fillcap" and isAdmin then
 			if arg2 ~= nil then
-				if tonumber(arg3) ~= nil then
-					for target in players.iterate() do
-						if target.name == arg2 then
-							target.hellfireHealth.fillCap = tonumber(arg3)
+				if arg3 ~= nil then
+					if tonumber(arg3) ~= nil then
+						if tonumber(arg3) > 0 and tonumber(arg3) < 256 then
+							for target in players.iterate() do
+								if target.name == arg2 then
+									target.hellfireHealth.fillCap = tonumber(arg3)
 
-							target.hellfireHealth.health = target.hellfireHealth.maxHealth
-							target.hellfireHealth.curRing = target.hellfireHealth.maxHealth-1
+									target.hellfireHealth.health = target.hellfireHealth.maxHealth
+									target.hellfireHealth.curRing = target.hellfireHealth.maxHealth-1
 
-							resetRings(target.hellfireHealth)
-							CONS_Printf(target, "\x8B\bAdministrator \x86"..ply.name.."\x80 has changed your amount needed to fill a health ring to \x82"..arg3.."\x80.")
-							CONS_Printf(target, "Your health has been refilled and changed to reflect this new setting.")
+									resetRings(target.hellfireHealth)
+									CONS_Printf(target, "\x8B\bAdministrator \x86"..ply.name.."\x80 has changed your amount needed to fill a health ring to \x82"..arg3.."\x80.")
+									CONS_Printf(target, "Your health has been refilled and changed to reflect this new setting.")
 
-							if arg4 ~= nil then
-								CONS_Printf(target, "\x85They also left you a message:\x82\n"..arg4)
+									if arg4 ~= nil then
+										CONS_Printf(target, "\x85They also left you a message:\x82\n"..arg4)
+									end
+
+									CONS_Printf(ply, "You set \x85"..arg2.."\x80\b's health ring fill cap to \x82"..tostring(target.hellfireHealth.fillCap).."\x80.")
+
+									return
+								end
 							end
-
-							CONS_Printf(ply, "You set \x85"..arg2.."\x80\b's health ring fill cap to \x82"..tostring(target.hellfireHealth.fillCap).."\x80.")
-
-							return
+						else
+							CONS_Printf(ply, "\x85\bThe value \""..arg3.."\" is out of range!")
 						end
+					else
+						CONS_Printf(ply, "\x85\bThe value \""..arg3.."\" is NOT a number!")
 					end
 				else
-					CONS_Printf(ply, "\x85\bThe value \""..arg3.."\" is NOT a number!")
+					CONS_Printf(ply, "\x85\bYou need a value!")
 				end
 			else
 				CONS_Printf(ply, "\x85\bYou need to put in a player's name to use this command!\nIf you want to change EVERYONE's fill cap, use the cvar instead.")
