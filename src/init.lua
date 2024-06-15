@@ -562,28 +562,55 @@ COM_AddCommand("hellfire_admin", function(admin, arg1, arg2, arg3, target, messa
 end, COM_ADMIN)
 
 --Special cvars that allows the maxHealth and fillAmt of EVERY player to be changed.
-CV_RegisterVar({"hellfire_maxHealth", "5", CV_NETVAR|CV_NOINIT|CV_CALL, {MIN=0, MAX=49}, function(var)
-	print("\x85\bEVERYONE'S MAX HEALTH HAS BEEN CHANGED TO "..var.string.." HEALTH RINGS.\x80")
-	print("\x85\bHEALTH HAS BEEN REFILLED AND CHANGED TO REFLECT THIS NEW SETTING.\x80")
-	for ply in players.iterate() do
-		ply.hellfireHealth.maxHealth = var.value
-		
-		ply.hellfireHealth.health = ply.hellfireHealth.maxHealth
-		ply.hellfireHealth.curRing = ply.hellfireHealth.maxHealth-1
+CV_RegisterVar({"hellfire_maxHealth", "5", CV_NETVAR|CV_NOINIT|CV_CALL, {MIN=1, MAX=49}, function(var)
+	if var.changed then
+		local varString = var.string
+		if var.string == "MIN" or var.value == 1 then
+			varString = "THE MINIMUM AMOUNT (1) OF"
+		elseif var.string == "MAX" or var.value == 49 then
+			varString = "THE MAXIMUM AMOUNT (49) OF"
+		end
+		print("\x85\bEVERYONE'S MAX HEALTH HAS BEEN CHANGED TO "..varString.." HEALTH RINGS.\x80")
+		print("\x85\bHEALTH HAS BEEN REFILLED AND CHANGED TO REFLECT THIS NEW SETTING.\x80")
+		for ply in players.iterate() do
+			ply.hellfireHealth.maxHealth = var.value
 
-		resetRings(ply.hellfireHealth)
+			ply.hellfireHealth.health = ply.hellfireHealth.maxHealth
+			ply.hellfireHealth.curRing = ply.hellfireHealth.maxHealth-1
+
+			resetRings(ply.hellfireHealth)
+		end
 	end
 end})
-CV_RegisterVar({"hellfire_fillCap", "5", CV_NETVAR|CV_NOINIT|CV_CALL, {MIN=0, MAX=255}, function(var)
-	print("\x85\bEVERYONE'S AMOUNT NEEDED TO FILL A HEALTH RING HAS BEEN CHANGED TO "..var.string.." RINGS.\x80")
-	print("\x85\bHEALTH HAS BEEN REFILLED AND CHANGED TO REFLECT THIS NEW SETTING.\x80")
-	for ply in players.iterate() do
-		ply.hellfireHealth.fillCap = var.value
-		
-		ply.hellfireHealth.health = ply.hellfireHealth.maxHealth
-		ply.hellfireHealth.curRing = ply.hellfireHealth.maxHealth-1
+CV_RegisterVar({"hellfire_fillCap", "5", CV_NETVAR|CV_NOINIT|CV_CALL, {MIN=1, MAX=255}, function(var)
+	if var.changed then
+		local varString = var.string
+		if var.string == "MIN" or var.value == 1 then
+			varString = "THE MINIMUM AMOUNT (1) OF"
+		elseif var.string == "MAX" or var.value == 255 then
+			varString = "THE MAXIMUM AMOUNT (255) OF"
+		end
+		print("\x85\bEVERYONE'S AMOUNT NEEDED TO FILL A HEALTH RING HAS BEEN CHANGED TO "..varString.." RINGS.\x80")
+		print("\x85\bHEALTH HAS BEEN REFILLED AND CHANGED TO REFLECT THIS NEW SETTING.\x80")
+		for ply in players.iterate() do
+			ply.hellfireHealth.fillCap = var.value
 
-		resetRings(ply.hellfireHealth)
+			ply.hellfireHealth.health = ply.hellfireHealth.maxHealth
+			ply.hellfireHealth.curRing = ply.hellfireHealth.maxHealth-1
+
+			resetRings(ply.hellfireHealth)
+		end
+	end
+end})
+CV_RegisterVar({"hellfire_botEnable", "Off", CV_NETVAR|CV_NOINIT|CV_CALL, {Off=0, On=1}, function(var)
+	if var.value == 0 then
+		if var.changed then
+			print("\x85\bBots are no longer affected by the health system!\x80")
+		end
+	else
+		if var.changed then
+			print("\x85\bBots are now affected by the health system!\x80")
+		end
 	end
 end})
 
@@ -642,6 +669,89 @@ local function isSpecialDeathSkin(ply)
 	return(false)
 end
 
+--A half-port of P_HitDeathMessages for any modes requiring it (since it never executes with HellfireHealth on).
+--This is only used in DamageMobj since KillMobj still executes normally.
+--This might become it's own standalone mod, since this is a issue with any mod that blocks normal damage code execution.
+local function hurtMessages(target, cause, src, dmgType)
+	--Setup variables for easy access.
+	local ply = target.player
+	local hellfire = ply.hellfireHealth
+
+	--ONLY run if HellfireHealth is on.
+	if not(hellfire.notAllowed) and not(hellfire.options.disabled) then
+		local targetName = ply.name
+		local srcName = src.player.name
+
+		if src.player.state == PST_DEAD then
+			srcName = "The late "..src.player.name
+		end
+
+		if src.flags & MF_PUSHABLE then
+			print(srcName.."'s playtime with heavy objects hit "..targetName..".")
+		elseif cause ~= nil and cause.valid then
+			local objType = cause.type
+
+			if objType == MT_PLAYER then
+				if dmgType == DMG_NUKE then
+					print(srcName.."'s armageddon blast hit "..targetName..".")
+				elseif ((cause.player.powers[pw_shield] & SH_NOSTACK) == SH_ELEMENTAL) and (cause.player.pflags & PF_SHIELDABILITY) then
+					print(srcName.."'s elemental stomp hit "..targetName..".")
+				elseif cause.player.powers[pw_invulnerability] then
+					print(srcName.."'s invincibility aura hit "..targetName..".")
+				elseif cause.player.powers[pw_super] then
+					print(srcName.."'s super aura hit "..targetName..".")
+				else
+					print(srcName.."'s tagging hand hit "..targetName..".")
+				end
+			elseif objType == MT_SPINFIRE then
+				print(srcName.."'s elemental fire trail hit "..targetName..".")
+			elseif objType == MT_REDRING then
+				if cause.flags2 & MF2_RAILRING then
+					print(srcName.."'s rail ring hit "..targetName..".")
+				else
+					print(srcName.."'s thrown ring hit "..targetName..".")
+				end
+			elseif objType == MT_THROWNBOUNCE then
+				print(srcName.."'s bounce ring hit "..targetName..".")
+			elseif objType == MT_THROWNINFINITY then
+				print(srcName.."'s infinity ring hit "..targetName..".")
+			elseif objType == MT_THROWNAUTOMATIC then
+				print(srcName.."'s automatic ring hit "..targetName..".")
+			elseif objType == MT_THROWNSCATTER then
+				print(srcName.."'s scatter ring hit "..targetName..".")
+			elseif objType == MT_THROWNEXPLOSION then
+				print(srcName.."'s explosion ring hit "..targetName..".")
+			elseif objType == MT_THROWNGRENADE then
+				print(srcName.."'s grenade ring hit "..targetName..".")
+			else
+				print(srcName.." hit "..targetName..".")
+			end
+		elseif src ~= nil and src.valid then
+			local objType = src.type
+
+			if objType == MT_EGGMAN_ICON then
+				print(targetName.." was hit by Eggman's nefarious TV magic.")
+			elseif objType == MT_SPIKE or objType == MT_WALLSPIKE then
+				print(targetName.." was hit by spikes.")
+			else
+				print(targetName.." was hit by an environmental hazard.")
+			end
+		else
+			if dmgType == DMG_WATER then
+				print(targetName.." was hit by dangerous water.")
+			elseif dmgType == DMG_FIRE then
+				print(targetName.." was hit by molten lava.")
+			elseif dmgType == DMG_ELECTRIC then
+				print(targetName.." was hit by electricity.")
+			elseif dmgType == DMG_SPIKE then
+				print(targetName.." was hit by spikes.")
+			else
+				print(targetName.." was hit by an environmental hazard.")
+			end
+		end
+	end
+end
+
 local function killPlayer(hellfire, healthLoss, target, cause, src)
 	local ply = target.player
 
@@ -678,7 +788,7 @@ end
 --Damage handler.
 local function dmgHandler(target, cause, src, dmg, dmgType)
 	if not(target) or not(target.valid) then return end --Non-valid checker
-	if target.player.bot then return end --Don't execute for bots.
+	if target.player.bot and CV_FindVar("hellfire_botEnable").value == 0 then return end --Don't execute for bots if not allowed.
 
 	--Setup variables for easy access.
 	local ply = target.player
@@ -695,6 +805,7 @@ local function dmgHandler(target, cause, src, dmg, dmgType)
 		else
 			--Hurt code; removed an unnecessary pain check.
 			P_DoPlayerPain(ply, cause, src)
+			hurtMessages(target, cause, src, dmgType)
 
 			--Remove/damage the shield if it exists instead (also some special exceptions for characters like the Mario Bros to get around their shield hack).
 			if ply.powers[pw_shield] ~= SH_NONE and not(isShieldHackSkin(ply)) then
@@ -724,6 +835,11 @@ local function dmgHandler(target, cause, src, dmg, dmgType)
 						ply.rings = 0
 					else
 						ply.rings = $-2*((hellfire.maxHealth-hellfire.health)+1)
+					end
+
+					--Stuff for ringslinger; forces the player to drop weapons, ammo and emeralds like normal ringslinger, except without the rings.
+					if G_RingSlingerGametype() then
+						P_PlayerRingBurst(ply, 0)
 					end
 				end
 
@@ -757,7 +873,7 @@ end
 --Little death handler for anything that instantly kills the player.
 local function deathHandler(target, cause, src, dmgType)
 	if not(target) or not(target.valid) then return end --Non-valid checker
-	if target.player.bot then return end --Don't execute for bots.
+	if target.player.bot and CV_FindVar("hellfire_botEnable").value == 0 then return end --Don't execute for bots if not allowed.
 
 	--Setup variables for easy access.
 	local ply = target.player
