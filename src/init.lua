@@ -818,69 +818,76 @@ local function dmgHandler(target, cause, src, dmg, dmgType)
 		local targetRing = hellfire.rings[hellfire.curRing]
 		local ringAhead = hellfire.rings[hellfire.curRing+1]
 
-		--Kill the player if they take damage with a health value of one.
-		if hellfire.health == 1 then
-			killPlayer(hellfire, true, target, cause, src)
-		else
-			--Hurt code; removed an unnecessary pain check.
-			P_DoPlayerPain(ply, cause, src)
-			hurtMessages(target, cause, src, dmgType)
-
+		--Stop Fang (and any others like him) from spamming the player to death.
+		if ply.powers[pw_flashing] <= 0 then
 			--Remove/damage the shield if it exists instead (also some special exceptions for characters like the Mario Bros to get around their shield hack).
 			if ply.powers[pw_shield] ~= SH_NONE and not(isShieldHackSkin(ply)) then
 				P_RemoveShield(ply) --Damage the shield.
 				P_PlayDeathSound(target, ply) --Play the normal damage sound.
+				P_DoPlayerPain(ply, src, cause)
 			else
-				S_StartSound(target, sfx_hfloss, ply) --Play the health ring loss sfx.
-				--Do the multiplayer burst stuff.
-				P_PlayerEmeraldBurst(ply)
-				P_PlayerWeaponPanelOrAmmoBurst(ply)
-				P_PlayerFlagBurst(ply)
-
-				--Ring code (spills and subtractions).
-				if hellfire.options.doRingSpill then
-					local subtractRingAmt = 2*((hellfire.maxHealth-hellfire.health)+1)
-					local newRingCount = ply.rings-subtractRingAmt
-
-					if newRingCount > 0 then
-						P_PlayerRingBurst(ply, subtractRingAmt)
-						ply.rings = newRingCount
-					else
-						newRingCount = subtractRingAmt+(ply.rings-subtractRingAmt)
-						P_PlayerRingBurst(ply, newRingCount)
-						ply.rings = 0
-					end
-
-					hellfire.ringDeficit = subtractRingAmt
+				--Kill the player if they take damage with a health value of one.
+				if hellfire.health == 1 then
+					killPlayer(hellfire, true, target, cause, src)
 				else
-					--No ring spill? You just lose rings, then.
-					if ply.rings-2*((hellfire.maxHealth-hellfire.health)+1) < 0 then --No negatives.
-						ply.rings = 0
+					--Hurt code.
+					P_DoPlayerPain(ply, src, cause)
+					hurtMessages(target, cause, src, dmgType)
+
+					S_StartSound(target, sfx_hfloss, ply) --Play the health ring loss sfx.
+					--Do the multiplayer burst stuff.
+					P_PlayerEmeraldBurst(ply)
+					P_PlayerWeaponPanelOrAmmoBurst(ply)
+					P_PlayerFlagBurst(ply)
+
+					--Ring code (spills and subtractions).
+					if hellfire.options.doRingSpill then
+						local subtractRingAmt = 2*((hellfire.maxHealth-hellfire.health)+1)
+						local newRingCount = ply.rings-subtractRingAmt
+
+						if newRingCount > 0 then
+							P_PlayerRingBurst(ply, subtractRingAmt)
+							ply.rings = newRingCount
+						else
+							newRingCount = subtractRingAmt+(ply.rings-subtractRingAmt)
+							P_PlayerRingBurst(ply, newRingCount)
+							ply.rings = 0
+						end
+
+						hellfire.ringDeficit = subtractRingAmt
 					else
-						ply.rings = $-2*((hellfire.maxHealth-hellfire.health)+1)
-					end
-				end
-
-				--Health stuff.
-				if hellfire.health > 1 then
-					hellfire.health = $-1
-					targetRing.fillAmt = 0
-					targetRing.state = "empty"
-					targetRing.doShrivel = true --Do ring loss animation
-					if ringAhead ~= nil and ringAhead.fillAmt > 0 then --Remove any progress on next ring.
-						ringAhead.fillAmt = 0
+						--No ring spill? You just lose rings, then.
+						if ply.rings-2*((hellfire.maxHealth-hellfire.health)+1) < 0 then --No negatives.
+							ply.rings = 0
+						else
+							ply.rings = $-2*((hellfire.maxHealth-hellfire.health)+1)
+						end
 					end
 
-					--Get the next ring to fill.
-					if getRingWithState(hellfire, "filled") == nil then
-						hellfire.curRing = getRingWithState(hellfire, "empty", true)
-					else
-						hellfire.curRing = getRingWithState(hellfire, "filled")
-					end
+					--Health stuff.
+					if hellfire.health > 1 then
+						hellfire.health = $-1
+						targetRing.fillAmt = 0
+						targetRing.state = "empty"
+						targetRing.doShrivel = true --Do ring loss animation
+						if ringAhead ~= nil and ringAhead.fillAmt > 0 then --Remove any progress on next ring.
+							ringAhead.fillAmt = 0
+						end
 
-					hellfire.transStuff.doFade = true
+						--Get the next ring to fill.
+						if getRingWithState(hellfire, "filled") == nil then
+							hellfire.curRing = getRingWithState(hellfire, "empty", true)
+						else
+							hellfire.curRing = getRingWithState(hellfire, "filled")
+						end
+
+						hellfire.transStuff.doFade = true
+					end
 				end
 			end
+		else
+			--Duplicate P_DoPlayerPain to replicate stock behavior better (Fang's cork gun doing knockback no matter what).
+			P_DoPlayerPain(ply, src, cause)
 		end
 
 		--Stop the rest of the OG damage code.
