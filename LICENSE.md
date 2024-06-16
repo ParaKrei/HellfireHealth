@@ -2,6 +2,8 @@
 This repository (including the code, assets, and raw asset files), falls under the "Sonic Robo Blast 2" message board's "Open Assets" license.
 
 If you want to use ANYTHING in this repo, or make any forks/derivatives, you MUST follow the rules.
+
+This repository will also never be for profit, and any forks should be non-profit as well.
 ## A basic summary
 If you use any assets from this online repository on GitHub, then you must credit the author, and provide a link to the original mod in your own mod's description.
 
