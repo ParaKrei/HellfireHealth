@@ -15,9 +15,13 @@ SRC: ("https://git.do.srb2.org/STJr/SRB2/-/merge_requests/2185").
 ]]
 
 --Freeslot stuff
-freeslot("SPR_HFHP") --Health Plate
-freeslot("SPR_HFMN") --Main Ring
-freeslot("SPR_HFHR") --Half-Ring
+freeslot("SPR_HRHP") --Health Plate (Red)
+freeslot("SPR_HRMR") --Main Ring (Red)
+freeslot("SPR_HRHR") --Half-Ring (Red)
+freeslot("SPR_HYHP") --Health Plate (Yellow)
+freeslot("SPR_HYMR") --Main Ring (Yellow)
+freeslot("SPR_HYHR") --Half-Ring (Yellow)
+freeslot("SPR_HFPE") --Health Plate End
 freeslot("SPR_HFBP") --A little black pixel for drawing rectangles
 freeslot("sfx_hfloss") --Health loss SFX
 sfxinfo[sfx_hfloss].caption = "\x85\bHealth Ring loss\x80"
@@ -82,6 +86,7 @@ local function initHellfire(ply)
 				allowOnAllChars = false,
 				doRingSpill = false,
 				doDeathJingle = true,
+				skin = "red"
 			},
 			notAllowed = false,
 			maxHealth = 5,
@@ -188,6 +193,9 @@ EXAMPLE: "hellfire set disablesystem true".
 ]]..'\x8C\bAvailable variables:\x80\n'..[[
 ]]..'"\x82\bdeathjingle\x80"'..[[ = Sets if the death jingle should be enabled; [either: true or false].
 
+]]..'"\x82\bskin\x80"'..[[ = Sets the color of the rings and "HP" text;
+[either: red/r or yellow/y; not case-sensitive].
+
 ]]..'"\x82\bspecialstages\x80"'..[[ = Sets if the health system works in special stages
 (NiGHTs stages, multiplayer special stages, etc.) [either: true or false].
 
@@ -221,6 +229,12 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 						set_hellfireBoolVar(ply, "doDeathJingle", arg3:lower(), {
 							trueStatement="The \x85Hellfire Saga\x80 the death jingle is now \x82\benabled\x80.",
 							falseStatement="The \x85Hellfire Saga\x80 the death jingle is now \x82\bdisabled\x80."
+						})
+					elseif arg2:lower() == "skin" then
+						--Client tweak ONLY; no admin tweaking allowed.
+						set_hellfireStrVar(ply, "skin", arg3:lower(), {returnVal="red", values={"red", "r"}}, {returnVal="yellow", values={"yellow", "y"}}, {
+							statement1="The \x85Hellfire Saga\x80 now uses the color \x82\bred\x80.",
+							statement2="The \x85Hellfire Saga\x80 now uses the color \x82\byellow\x80."
 						})
 					elseif arg2:lower() == "specialstages" then
 						if isAdmin then
@@ -373,7 +387,7 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 				CONS_Printf(ply, "======================================================")
 				CONS_Printf(ply, "ADDITIONAL NOTES FOR ADMINISTRATORS:")
 				CONS_Printf(ply, "======================================================")
-				CONS_Printf(ply, "You CAN NOT mess with a player's death jingle, as that's their preference.")
+				CONS_Printf(ply, "You CAN NOT mess with a player's death jingle or skin, as that's their preference.")
 				CONS_Printf(ply, "There is a fourth (optional) argument [second if command is short] for this version,\nwhich allows you to modify a specific player's values.\nIt is case sensitive.")
 				CONS_Printf(ply, "There is also a fifth (optional) argument [third if command is short] for this version,\nwhich allows you to send a message to the player in the fourth argument.")
 				CONS_Printf(ply, "You can also set the max health and fill amount for individual players via the \"maxHealth\" and \"fillCap\" commands.")
@@ -1090,6 +1104,13 @@ local function hudHandler(hudDrawer, ply)
 	local hellfire = ply.hellfireHealth
 
 	if not(hellfire.notAllowed) and not(hellfire.options.disabled) then
+		local graphicPrefix = ""
+		if hellfire.options.skin == "red" then
+			graphicPrefix = "HR"
+		elseif hellfire.options.skin == "yellow" then
+			graphicPrefix = "HY"
+		end
+
 		--Alpha stuff (for fading in/out the HUD).
 		local hudTrans = 0
 		if hellfire.isDead then
@@ -1152,8 +1173,8 @@ local function hudHandler(hudDrawer, ply)
 
 		--Stop drawing stuff once the alpha hits the max value.
 		if hellfire.transStuff.overallAlpha < 10 then
-			local healthPlate = hudDrawer.getSpritePatch("HFHP", hellfire.healthPlate.frame)
-			local mainRing = hudDrawer.getSpritePatch("HFMN", hellfire.mainRing.frame)
+			local healthPlate = hudDrawer.getSpritePatch(graphicPrefix.."HP", hellfire.healthPlate.frame)
+			local mainRing = hudDrawer.getSpritePatch(graphicPrefix.."MR", hellfire.mainRing.frame)
 			local basePos = {x=hudinfo[HUD_RINGS].x-1, y=hudinfo[HUD_RINGS].y+15} --Get the position of the og "RINGS" HUD element and position off of that.
 
 			--Death animation for the base-plate.
@@ -1174,7 +1195,7 @@ local function hudHandler(hudDrawer, ply)
 			boxDraw(hudDrawer, (basePos.x+54), basePos.y, ringsWidth, boxHeight, V_PERPLAYER|hudTrans) --Half-Rings backdrop.
 
 			--For a while, I couldn't get the position correct, UNTIL I remembered that I divided the boxWidth by 5 in the boxDraw function.
-			simpleStretchedDraw(hudDrawer, (basePos.x+54)+(ringsWidth/5), basePos.y+(hellfire.ringWrapCount+(1/3)), FU/2, hudDrawer.getSpritePatch("HFHP", 7), hellfire.endWidth, hellfire.ringWrapCount+1, V_PERPLAYER|hudTrans) --HP End.
+			simpleStretchedDraw(hudDrawer, (basePos.x+54)+(ringsWidth/5), basePos.y+(hellfire.ringWrapCount+(1/3)), FU/2, hudDrawer.getSpritePatch("HFPE", 0), hellfire.endWidth, hellfire.ringWrapCount+1, V_PERPLAYER|hudTrans) --HP End.
 
 			--Ring deficit counter.
 			if ply.jointime % 10 == 5 then
@@ -1212,7 +1233,7 @@ local function hudHandler(hudDrawer, ply)
 						end
 					end
 				end
-				local patch = hudDrawer.getSpritePatch("HFHR", hellfire.rings[i].frame)
+				local patch = hudDrawer.getSpritePatch(graphicPrefix.."HR", hellfire.rings[i].frame)
 
 				scaledDraw_MultPos(hudDrawer, hellfire.rings[i].x, hellfire.rings[i].y, FU/2, patch, V_PERPLAYER|hudTrans)
 			end
