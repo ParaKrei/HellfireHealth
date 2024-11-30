@@ -86,7 +86,7 @@ addHook("MobjThinker", function(mobj)
 			mobj.flags2 = $|MF2_DONTDRAW
 		end
 
-		P_MoveOrigin(mobj, ply.mo.x, ply.mo.y, (ply.mo.z+ply.mo.height)+(20*FU))
+		hfMoveMobj(mobj, ply.mo.x, ply.mo.y, (ply.mo.z+ply.mo.height)+(20*FU))
 
 		for i,clone in ipairs(mobj.clones) do
 			if not(disableRender) then
@@ -109,7 +109,7 @@ addHook("MobjThinker", function(mobj)
 				clone.flags2 = $|MF2_DONTDRAW
 			end
 
-			P_MoveOrigin(clone, mobj.x, mobj.y, mobj.z)
+			hfMoveMobj(clone, mobj.x, mobj.y, mobj.z)
 		end
 	end
 end, MT_HFBAR)

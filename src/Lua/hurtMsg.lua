@@ -13,11 +13,48 @@ rawset(_G, "hurtMessages", function(target, cause, src, dmgType)
 
 		--ONLY continue if HellfireHealth is on.
 		if not(hellfire.notAllowed) and not(hellfire.options.disabled) then
-			local targetName = ply.name
-			local srcName = src.player.name
+			--Battle override (for players)!
+			if cause ~= nil and cause.valid and cause.player ~= nil and cause.player.battle_hurttxt then
+				if CBW_Battle ~= nil then
+					local message = cause.player.battle_hurttxt
+					print(CBW_Battle.CustomHurtMessage(ply, cause, message))
+					return
+				end
+			end
 
-			if src.player.state == PST_DEAD then
-				srcName = "The late "..src.player.name
+			local targetName = ply.name
+			local srcName = ""
+			if src ~= nil and src.valid then
+				if src.player ~= nil then
+					srcName = src.player.name
+				else
+					if src.name ~= nil then
+						srcName = src.name
+					elseif src.info.name ~= nil then
+						srcName = src.info.name
+					else
+						srcName = "Something"
+					end
+				end
+			end
+
+			--Battle override (non-players)!
+			if cause ~= nil and cause.valid and cause.type ~= MT_PLAYER then
+				if CBW_Battle ~= nil then
+					local name = ""
+					if cause.name ~= nil then name = cause.name
+					elseif cause.info.name ~= nil then name = cause.info.name
+					else name = "Something" end
+
+					print(CBW_Battle.CustomHurtMessage(ply, src, name))
+					return
+				end
+			end
+
+			if src.player ~= nil and src.player.state == PST_DEAD then
+				srcName = "The late "+srcName
+			elseif src.health <= 0 then
+				srcName = "The late "+srcName
 			end
 
 			if src.flags & MF_PUSHABLE then

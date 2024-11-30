@@ -74,7 +74,7 @@ rawset(_G, "set_hellfireBoolVar", function(ply, var, newVal, replyTbl)
 			CONS_Printf(ply, replyTbl.falseStatement)
 		end
 	else
-		print("ERR: \""..tostring(newVal).."\" is nether true nor false.")
+		CONS_Printf(ply, "ERR: \""..tostring(newVal).."\" is nether true nor false.")
 	end
 end)
 
@@ -94,7 +94,7 @@ rawset(_G, "set_hellfireStrVar", function(ply, var, newVal, valTbl1, valTbl2, re
 			CONS_Printf(ply, replyTbl.statement2)
 		end
 	else
-		print("ERR: \""..tostring(newVal).."\" doesn't match any of the specified values.")
+		CONS_Printf(ply, "ERR: \""..tostring(newVal).."\" doesn't match any of the specified values.")
 	end
 end)
 
@@ -125,7 +125,7 @@ rawset(_G, "getClientList", function()
 	if fileStr == "" or fileStr == nil then
 		fileStr = "{}"
 	end
-	local decoded = json.decode(fileStr)
+	local decoded = hf_json.decode(fileStr)
 	file:close()
 
 	return(decoded)
@@ -149,7 +149,7 @@ rawset(_G, "modifyClientList", function(skin, tbl)
 		end
 	end
 	
-	file:write(json.encode(decoded))
+	file:write(hf_json.encode(decoded))
 	file:close()
 	
 	return(changed)
@@ -162,7 +162,7 @@ rawset(_G, "fetchServerList", function()
 		if fileStr == "" or fileStr == nil then
 			fileStr = "{}"
 		end
-		HFSrvList = json.decode(fileStr)
+		HFSrvList = hf_json.decode(fileStr)
 		file:close()
 	end)
 	
@@ -173,7 +173,7 @@ rawset(_G, "flushServerList", function()
 	local decoded = HFSrvList
 	local file = io.openlocal("hf_serverList.txt", "w")
 
-	file:write(json.encode(decoded))
+	file:write(hf_json.encode(decoded))
 	file:close()
 	
 	return(true)
@@ -198,6 +198,92 @@ rawset(_G, "modifyServerList", function(skin, tbl)
 	end
 	
 	return(changed)
+end)
+
+rawset(_G, "getPrefs", function()
+	local file = io.openlocal("client/hf_prefs.txt", "r")
+
+	local prefs = {}
+	for line in file:lines() do
+		if line:find("^#.+$") == nil and #line > 0 and line ~= "\n" then
+			local commentClear = line:gsub("#.+$", "")
+			local spaces = commentClear:gsub(" $", "")
+			local newlines = spaces:gsub("\n$", "")
+			
+			local var = newlines:gsub(" = .+", "")
+			local value = newlines:gsub(".+ = ", "")
+			
+			for prefName, trueName in pairs(hfPrefsMapping) do
+				if var:lower() == prefName then
+					if value:lower() == "true" then
+						prefs[trueName] = true
+					elseif value:lower() == "false" then
+						prefs[trueName] = false
+					else
+						prefs[trueName] = value:lower()
+					end
+				end
+			end
+		end
+	end
+	file:close()
+
+	return(prefs)
+end)
+
+rawset(_G, "getPrefsRaw", function()
+	local file = io.openlocal("client/hf_prefs.txt", "r")
+
+	local tbl = {}
+	for line in file:lines() do
+		table.insert(tbl, line)
+	end
+	file:close()
+
+	return(tbl)
+end)
+
+local function checkEquals(line)
+	if line:find(" = ") ~= nil then
+		return(" = ")
+	elseif line:find(" =") ~= nil then
+		return(" =")
+	elseif line:find("= ") ~= nil then
+		return("= ")
+	else
+		return("=")
+	end
+end
+
+rawset(_G, "savePrefs", function(hellfire)
+	local tbl = {}
+	for _,line in pairs(getPrefsRaw()) do
+		if line:find("^#.+$") == nil and #line > 0 and line ~= "\n" then
+			local equPattern = checkEquals(line)
+
+			local commentClear = line:gsub("#.+$", "")
+			local spaces = commentClear:gsub(" $", "")
+			local newlines = spaces:gsub("\n$", "")
+			
+			local var = newlines:gsub(equPattern+".+", "")
+			local value = newlines:gsub(".+"+equPattern, "")
+			
+			for prefName, trueName in pairs(hfPrefsMapping) do
+				if var:lower() == prefName then
+					local newValue = hellfire.options[trueName]
+					local compLine = line:gsub(equPattern+value, equPattern+tostring(newValue))
+					table.insert(tbl, compLine)
+				end
+			end
+		else
+			table.insert(tbl, line)
+		end
+	end
+	local newContents = table.concat(tbl, "\n")
+	
+	local file = io.openlocal("client/hf_prefs.txt", "w")
+	file:write(newContents)
+	file:close()
 end)
 
 --Skin comparison function for characters using shield hacks for their damage system.
@@ -297,4 +383,163 @@ rawset(_G, "removeAllBars", function()
 	end
 	
 	HFBars = {}
+end)
+
+--A little function that will try all three moving functions to keep compatibility with pre-2.2.11.
+rawset(_G, "hfMoveMobj", function(mobj, x, y, z)
+	if pcall(P_MoveOrigin, mobj, x, y, z) ~= true then
+		if pcall(P_SetOrigin, mobj, x, y, z) ~= true then
+			P_TeleportMove(mobj, x, y, z)
+		end
+	end
+end)
+
+rawset(_G, "loadPrefs", function(ply)
+	local hellfire = ply.hellfireHealth
+
+	for var,val in pairs(getPrefs()) do
+		local finalVal = val
+		if var == "skin" then
+			if finalVal ~= "red" and finalVal ~= "yellow" then
+				CONS_Printf(ply, '\x85"'..tostring(finalVal)..'"'.." isn't a valid option, so it has been set to the default.")
+				finalVal = "red"
+			end
+		end
+		if var == "doDeathJingle" or var == "seeHealth" or var == "autoSave" then
+			if finalVal ~= true and finalVal ~= false then
+				CONS_Printf(ply, '\x85"'..tostring(finalVal)..'"'.." isn't a valid option, so it has been set to the default.")
+				finalVal = true
+			end
+		end
+
+		hellfire.options[var] = finalVal
+	end
+end)
+
+--Damage function for mappers.
+rawset(_G, "hf_directDmg", function(ply, dmg, scales, silent)
+	local hellfire = ply.hellfireHealth
+
+	local trueTbl = {"true", "1", "on"}
+	local falseTbl = {"false", "0", "off"}
+
+	--You can't outright kill the player!
+	if hellfire.health == 1 then
+		return
+	end
+	
+	dmg = tonumber($)
+	if dmg == nil then dmg = 1 end
+
+	if type(scales) == "string" then
+		if table.concat(trueTbl, " "):find(scales:lower()) then
+			scales = true
+		elseif table.concat(falseTbl, " "):find(scales:lower())
+			scales = false
+		else
+			scales = false
+		end
+	end
+	
+	if scales then
+		if hellfire.maxHealth > 5 then
+			dmg = clamp($, 0, 4)
+			
+			if dmg == 1 then
+				dmg = hellfire.maxHealth/4
+			elseif dmg == 2 then
+				dmg = hellfire.maxHealth/3
+			elseif dmg == 3 then
+				dmg = hellfire.maxHealth/2
+			elseif dmg == 4 then
+				dmg = hellfire.maxHealth-1
+			end
+		end
+	else
+		--You can't outright kill the player!
+		dmg = clamp($, 0, hellfire.maxHealth-1)
+	end
+
+	if ply.powers[pw_flashing] <= 0 then
+		if dmg > 1 then
+			for i=0,dmg-2 do
+				if hellfire.curRing == 1 then break end
+
+				local targetRing = hellfire.rings[hellfire.curRing]
+				local ringAhead = hellfire.rings[hellfire.curRing+1]
+
+				targetRing.fillAmt = 0
+				targetRing.state = "empty"
+				targetRing.doShrivel = true --Do ring loss animation
+				if ringAhead ~= nil and ringAhead.fillAmt > 0 then --Remove any progress on next ring.
+					ringAhead.fillAmt = 0
+				end
+
+				hellfire.transStuff.doFade = true
+
+				hellfire.curRing = $-1
+			end
+		end
+		
+		hellfire.health = clamp($-(dmg-1), 2, hellfire.maxHealth)
+		P_DamageMobj(ply.mo)
+	end
+end)
+
+--Healing function for mappers.
+rawset(_G, "hf_directHeal", function(ply, newHlth, scales, silent)
+	local hellfire = ply.hellfireHealth
+
+	local trueTbl = {"true", "1", "on"}
+	local falseTbl = {"false", "0", "off"}
+
+	--No overheal!
+	if hellfire.health == hellfire.maxHealth then
+		return
+	end
+	
+	newHlth = tonumber($)
+	if newHlth == nil then newHlth = 1 end
+
+	if type(scales) == "string" then
+		if table.concat(trueTbl, " "):find(scales:lower()) then
+			scales = true
+		elseif table.concat(falseTbl, " "):find(scales:lower())
+			scales = false
+		else
+			scales = false
+		end
+	end
+
+	if scales then
+		if hellfire.maxHealth > 5 then
+			newHlth = clamp($, 0, 4)
+
+			if newHlth == 1 then
+				newHlth = hellfire.maxHealth/4
+			elseif newHlth == 2 then
+				newHlth = hellfire.maxHealth/3
+			elseif newHlth == 3 then
+				newHlth = hellfire.maxHealth/2
+			elseif newHlth == 4 then
+				newHlth = hellfire.maxHealth-1
+			end
+		end
+	else
+		--Ensures no overheal occurs.
+		newHlth = clamp($, 0, hellfire.maxHealth)
+	end
+
+	for i=0,newHlth do
+		local targetRing = hellfire.rings[hellfire.curRing]
+
+		targetRing.fillAmt = hellfire.fillCap
+		hellfire.curRing = clamp($+1, 0, hellfire.maxHealth-1)
+	end
+	
+	S_StartSound(target, sfx_hfgain, ply) --Play the health ring gain sfx.
+
+	--Yes, I'm putting in a LOT of these clamps.
+	hellfire.health = clamp($+newHlth, 0, hellfire.maxHealth)
+	hellfire.transStuff.doFade = true
 end)

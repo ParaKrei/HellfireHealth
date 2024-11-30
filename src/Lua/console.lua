@@ -22,6 +22,10 @@ You can fetch the available lists with "list" ("hellfire add list").
 EXAMPLE: "hellfire remove bannedskins tails".
 You can fetch the available lists with "list" ("hellfire remove list").
 ------------------------------------------------------
+]]..'"\x82\fsave\x80"'..[[ = Manually save your preferences.
+------------------------------------------------------
+]]..'"\x82\freload\x80"'..[[ = Reload any changes made to your preferences.
+------------------------------------------------------
 ]]..'"\x82\bdisable\x80"'..[[ = Shortcut to ]]..'"\x82set disablesystem true\x80"'..[[.
 ------------------------------------------------------
 ]]..'"\x82\benable\x80"'..[[ = Shortcut to ]]..'"\x82set disablesystem false\x80"'..[[.
@@ -43,6 +47,11 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 								trueStatement="The \x85Hellfire Saga\x80 the death jingle is now \x82\benabled\x80.",
 								falseStatement="The \x85Hellfire Saga\x80 the death jingle is now \x82\bdisabled\x80."
 							})
+
+							if ply.hellfireHealth.options.autoSave then
+								CONS_Printf(ply, "Saving your settings...")
+								savePrefs(ply.hellfireHealth)
+							end
 						else
 							CONS_Printf(ply, "Please use the non-admin command to set this.")
 						end
@@ -53,6 +62,11 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 								statement1="The \x85Hellfire Saga\x80 now uses the color \x82\bred\x80.",
 								statement2="The \x85Hellfire Saga\x80 now uses the color \x82\byellow\x80."
 							})
+
+							if ply.hellfireHealth.options.autoSave then
+								CONS_Printf(ply, "Saving your settings...")
+								savePrefs(ply.hellfireHealth)
+							end
 						else
 							CONS_Printf(ply, "Please use the non-admin command to set this.")
 						end
@@ -63,6 +77,28 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 								trueStatement="Health bar visibility \x85(for you)\x80 is now \x82\benabled\x80.",
 								falseStatement="Health bar visibility \x85(for you)\x80 is now \x82\bdisabled\x80."
 							})
+
+							if ply.hellfireHealth.options.autoSave then
+								CONS_Printf(ply, "Saving your settings...")
+								savePrefs(ply.hellfireHealth)
+							end
+						else
+							CONS_Printf(ply, "Please use the non-admin command to set this.")
+						end
+					elseif arg2:lower() == "autosave" then
+						--Client tweak ONLY; no admin tweaking allowed.
+						if not(isAdmin) then
+							local lastAutoSave = ply.hellfireHealth.options.autoSave
+
+							set_hellfireBoolVar(ply, "autoSave", arg3:lower(), {
+								trueStatement="Auto-saving is now \x82\benabled\x80.",
+								falseStatement="Auto-saving is now \x82\bdisabled\x80."
+							})
+
+							if lastAutoSave then
+								CONS_Printf(ply, "Saving your settings (you had auto-saving on before you changed it)...")
+								savePrefs(ply.hellfireHealth)
+							end
 						else
 							CONS_Printf(ply, "Please use the non-admin command to set this.")
 						end
@@ -207,12 +243,19 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 				elseif arg2:lower() == "help" then
 					CONS_Printf(ply, "\x8C\bAvailable variables:\x80")
 					CONS_Printf(ply, "\"\x82\bdeathjingle\x80\" = Sets if the death jingle should be enabled; [either: true or false].")
-
+					CONS_Printf(ply, "\x85This setting is affected by auto-save!")
+					
 					CONS_Printf(ply, "\"\x82\bskin\x80\" = Sets the color of the rings and \"HP\" text;")
 					CONS_Printf(ply, "[either: red/r or yellow/y; not case-sensitive].")
+					CONS_Printf(ply, "\x85This setting is affected by auto-save!")
 					
 					CONS_Printf(ply, "\"\x82\bhealthbars\x80\" = Set if you can see the health bars above players;")
 					CONS_Printf(ply, "[either: true or false].")
+					CONS_Printf(ply, "\x85This setting is affected by auto-save!")
+					
+					CONS_Printf(ply, "\"\x82\bautosave\x80\" = Set if your preferences will save for you;")
+					CONS_Printf(ply, "[either: true or false].")
+					CONS_Printf(ply, "\x85This setting is affected by auto-save (but it checks the last setting it was on)!")
 
 					CONS_Printf(ply, "\"\x82\bspecialstages\x80\" = Sets if the health system works in special stages;")
 					CONS_Printf(ply, "(NiGHTs stages, multiplayer special stages, etc.) [either: true or false].")
@@ -240,7 +283,7 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 				CONS_Printf(ply, "======================================================")
 				CONS_Printf(ply, "ADDITIONAL NOTES FOR ADMINISTRATORS:")
 				CONS_Printf(ply, "======================================================")
-				CONS_Printf(ply, "You CAN NOT mess with a player's death jingle, skin, health bar visibility, or their client list, as that's their preference.")
+				CONS_Printf(ply, "You CAN NOT mess with a player's death jingle, skin, health bar visibility, their client list, or if their preferences auto-save, as that's their preference.")
 				CONS_Printf(ply, "There is a fourth (optional) argument [second if command is short] for this version,\nwhich allows you to modify a specific player's values.\nIt is case sensitive.")
 				CONS_Printf(ply, "There is also a fifth (optional) argument [third if command is short] for this version,\nwhich allows you to send a message to the player in the fourth argument.")
 				CONS_Printf(ply, "You can also set the max health and fill amount for individual players via the \"maxHealth\" and \"fillCap\" commands.")
@@ -642,6 +685,20 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 				end
 			else
 				CONS_Printf(ply, "\x85You need to put in a variable name to remove anything to it!")
+			end
+		elseif arg1:lower() == "save" then
+			if not(isAdmin) then
+				CONS_Printf(ply, "\x85Saving your settings!")
+				savePrefs(ply.hellfireHealth)
+			else
+				CONS_Printf(ply, "Please use the non-admin command.")
+			end
+		elseif arg1:lower() == "reload" then
+			if not(isAdmin) then
+				CONS_Printf(ply, "\x85Reloading your settings!")
+				loadPrefs(ply)
+			else
+				CONS_Printf(ply, "Please use the non-admin command.")
 			end
 		else
 			CONS_Printf(ply, '\x85"'..arg1:lower()..'"'.." is NOT a valid argument!")

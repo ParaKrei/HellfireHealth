@@ -11,12 +11,18 @@ JSON library is by rxi (https://github.com/rxi/json.lua).
 ]]
 
 --[[
-There might be a GUI coded in to modify settings as well, since 2.2.14 will add in the ability to ignore player input with a variable.
+There might be a GUI coded in to modify settings AND preferences as well, since 2.2.14 will add in the ability to ignore player input with a variable.
 SRC: ("https://git.do.srb2.org/STJr/SRB2/-/merge_requests/2185").
 ]]
 
+--[[
+At some point (not now), try to implement Battle support.
+The main damage stuff is in "Exec_Player.lua"... SO MUCH has to be implemented.
+For now... no Battle support.
+]]
+
 --Import JSON library--
-rawset(_G, "json", dofile("lib/json"))
+rawset(_G, "hf_json", dofile("lib/json"))
 
 --Freeslot stuff--
 freeslot("SPR_HRHP") --Health Plate (Red)
@@ -60,7 +66,7 @@ addHook("NetVars", function(net)
 	HFSrvList = net(HFSrvList)
 end)
 
---Read/create client and server lists--
+--Create client and server lists--
 local defaultClient = {
 	["takisthefox"]={isBanned=true, shieldHack=false, deathOverride=false},
 	["samus"]={isBanned=true, shieldHack=false, deathOverride=false},
@@ -74,7 +80,7 @@ local defaultClient = {
 local tempCliList = io.openlocal("client/hf_clientList.txt", "r+")
 if tempCliList == nil then
 	tempCliList = io.openlocal("client/hf_clientList.txt", "w")
-	tempCliList:write(json.encode(defaultClient))
+	tempCliList:write(hf_json.encode(defaultClient))
 	tempCliList:flush()
 	tempCliList:close()
 else
@@ -91,6 +97,47 @@ end
 -- else
 -- 	tempSrvList:close()
 -- end
+
+--Create client preferences--
+local defaultPrefs = [[
+#Hello, ParaKrei here. Welcome to YOUR preferences file!
+#This is where the options that you changed for your tastes are saved.
+#I've made this as easy to read, modify and understand as much as possible!
+
+#All you need to do is to modify the values at the end of the equals (=) sign.
+#The values each option accepts are the same as the "set" command in-game!
+#My mod will read these values and apply it to your game when you spawn,
+#OR when you tell the game to reload these values.
+
+#I would advise not messing with anything before the equals sign,
+#as your values could get lost as the mod won't be able to read them anymore.
+#Also, do NOT remove the equals sign, or everything WILL break!
+
+#You can also put in your own commands by using the HASH (#) sign like I've been...
+#in case you want to put something here.
+
+Hear Death Jingle = true #Should be self-explanatory.
+UI Skin = red #The color of the health bars (both HUD and above players).
+See Health Bars = true #Should be self-explanatory.
+Auto Save = true #Should be self-explanatory.
+]]
+
+local tempPrefs = io.openlocal("client/hf_prefs.txt", "r+")
+if tempPrefs == nil then
+	tempPrefs = io.openlocal("client/hf_prefs.txt", "w")
+	tempPrefs:write(defaultPrefs)
+	tempPrefs:flush()
+	tempPrefs:close()
+else
+	tempPrefs:close()
+end
+
+rawset(_G, "hfPrefsMapping", {
+	["hear death jingle"]="doDeathJingle",
+	["ui skin"]="skin",
+	["see health bars"]="seeHealth",
+	["auto save"]="autoSave",
+})
 
 --Misc. functions--
 dofile("misc.lua")

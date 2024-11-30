@@ -13,7 +13,8 @@ local function initHellfire(ply)
 				doRingSpill = false,
 				doDeathJingle = true,
 				skin = "red",
-				seeHealth = true
+				seeHealth = true,
+				autoSave = true
 			},
 			notAllowed = false,
 			bypassServerList = false,
@@ -69,6 +70,9 @@ local function initHellfire(ply)
 	--Setup the health and curRing since it can't be done at define.
 	hellfire.health = hellfire.maxHealth
 	hellfire.curRing = hellfire.maxHealth-1
+
+	--Fetch the client's preferences and apply.
+	loadPrefs(ply)
 
 	--Setup the rings.
 	resetRings(hellfire)
@@ -272,6 +276,12 @@ end
 local function thkHandler(ply)
 	local hellfire = ply.hellfireHealth
 	if objectExists(ply.mo) ~= true then return end --Don't do anything if the player mobj doesn't exist.
+
+	--Stop EVERYTHING if Battle is loaded.
+	if CBW_Battle ~= nil then
+		hellfire.notAllowed = true
+		return
+	end
 
 	--Store the info on the current skin upon switch.
 	if ply.mo.skin ~= hellfire.lastSkin then
