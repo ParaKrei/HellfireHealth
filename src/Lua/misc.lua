@@ -371,10 +371,12 @@ end)
 --A quick function that removes all bars from the game.
 rawset(_G, "removeAllBars", function()
 	for _,bar in ipairs(HFBars) do
-		if bar ~= nil then
+		if objectExists(bar) then
 			for _,clone in ipairs(bar.clones) do
-				P_RemoveMobj(clone)
-				clone = nil
+				if objectExists(clone) then
+					P_RemoveMobj(clone)
+					clone = nil
+				end
 			end
 
 			P_RemoveMobj(bar)
