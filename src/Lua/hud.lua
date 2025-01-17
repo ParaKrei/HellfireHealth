@@ -134,7 +134,7 @@ local function hudHandler(hudDrawer, ply)
 		if hellfire.transStuff.overallAlpha < 10 then
 			local healthPlate = hudDrawer.getSpritePatch(graphicPrefix.."HP", hellfire.healthPlate.frame)
 			local mainRing = hudDrawer.getSpritePatch(graphicPrefix.."MR", hellfire.mainRing.frame)
-			local basePos = {x=hudinfo[HUD_RINGS].x-1, y=hudinfo[HUD_RINGS].y+15} --Get the position of the og "RINGS" HUD element and position off of that.
+			local basePos = hellfire.basePos
 
 			--Death animation for the base-plate.
 			if hellfire.health == 0 and hellfire.healthPlate.animDone == false then

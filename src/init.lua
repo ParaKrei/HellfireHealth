@@ -15,12 +15,6 @@ There might be a GUI coded in to modify settings AND preferences as well, since 
 SRC: ("https://git.do.srb2.org/STJr/SRB2/-/merge_requests/2185").
 ]]
 
---[[
-At some point (not now), try to implement Battle support.
-The main damage stuff is in "Exec_Player.lua"... SO MUCH has to be implemented.
-For now... no Battle support.
-]]
-
 --Import JSON library--
 rawset(_G, "hf_json", dofile("lib/json"))
 

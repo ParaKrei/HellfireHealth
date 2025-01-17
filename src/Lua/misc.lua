@@ -20,7 +20,7 @@ end)
 
 --Ring resetter function.
 rawset(_G, "resetRings", function(hellfire)
-	local basePos = {x=hudinfo[HUD_RINGS].x-1, y=hudinfo[HUD_RINGS].y+15} --Get the position of the og "RINGS" HUD element and position off of that.
+	local basePos = hellfire.basePos
 
 	hellfire.rings = {} --Clear rings table.
 	hellfire.ringWrapCount = 0 --Clear wrap count.

@@ -25,6 +25,7 @@ local function initHellfire(ply)
 			ringDeficit = 0,
 			ringDefColor = V_YELLOWMAP,
 			curRing = 0,
+			basePos = {x=hudinfo[HUD_RINGS].x-1, y=hudinfo[HUD_RINGS].y+15}, --Get the position of the og "RINGS" HUD element and position off of that.
 			mainRing = {frame=0, isAnimating=false, animDone=false},
 			healthPlate = {frame=0, isAnimating=false, animDone=false},
 			rings = {},
@@ -62,6 +63,11 @@ local function initHellfire(ply)
 	hellfire.healthPlate = {frame=0, isAnimating=false, animDone=false}
 	hellfire.transStuff.overallAlpha = 1
 	hellfire.transStuff.isFadingHUD = false
+
+	--Move the HUD to the position of the score text if BattleMod is loaded.
+	if CBW_Battle ~= nil then
+		hellfire.basePos.y = hudinfo[HUD_RINGS].y+34
+	end
 
 	--Fetch the cvars and set them.
 	hellfire.maxHealth = CV_FindVar("hellfire_maxHealth").value
@@ -119,6 +125,15 @@ local function dmgHandler(target, cause, src, dmg, dmgType)
 	--Setup variables for easy access.
 	local ply = target.player
 	local hellfire = ply.hellfireHealth
+
+	--Battle Overrides
+	if CBW_Battle ~= nil then
+		local battle = CBW_Battle
+
+		if battle.GuardTrigger(target, cause, src, dmg, dmgType) then
+			return true
+		end
+	end
 
 	if not(hellfire.notAllowed) and not(hellfire.options.disabled) then
 		--Setup the ring variables.
@@ -276,12 +291,6 @@ end
 local function thkHandler(ply)
 	local hellfire = ply.hellfireHealth
 	if objectExists(ply.mo) ~= true then return end --Don't do anything if the player mobj doesn't exist.
-
-	--Stop EVERYTHING if Battle is loaded.
-	if CBW_Battle ~= nil then
-		hellfire.notAllowed = true
-		return
-	end
 
 	--Store the info on the current skin upon switch.
 	if ply.mo.skin ~= hellfire.lastSkin then

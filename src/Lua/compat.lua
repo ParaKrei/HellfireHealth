@@ -3,6 +3,38 @@ Compatibility stuff.
 Special behavior will go here.
 ]]
 
+--NiGHTS Special Stage Death Fix--
+addHook("MobjDeath", function(target)
+	if G_IsSpecialStage() and maptol & TOL_NIGHTS then --Only trigger for NiGHTS singleplayer stages, as the others don't softlock.
+		local totalPlyCount = 0
+		local deadPlyCount = 0
+		local specCount = 0
+
+		--Check every player for multiplayer compatibility.
+		for ply in players.iterate() do
+			if objectExists(ply) then
+				if (not(ply.spectator) and ply.playerstate == PST_DEAD) or (objectExists(target) and objectExists(target.player) and ply == target.player) then
+					deadPlyCount = $+1 --Keeping count of dead players.
+				elseif ply.spectator then
+					specCount = $+1 --Keeping count of spectators
+				end
+
+				totalPlyCount = $+1 --Keeping count of total players.
+			end
+		end
+
+		--Exit level when every (non-spectator) player is dead.
+		if deadPlyCount == totalPlyCount-specCount then
+			--Set EVERYONE's exiting timer to ~2 seconds.
+			--I couldn't find a way to consistantly exit with just one player,
+			--so everyone gets the timer.
+			for ply in players.iterate() do
+				ply.exiting = (2*TICRATE)+3
+			end
+		end
+	end
+end, MT_PLAYER)
+
 --ORANGE DEMON--
 --Target HP instead.
 addHook("TouchSpecial", function(obj, target)
