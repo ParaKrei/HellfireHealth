@@ -1,3 +1,4 @@
+--Bar spawner--
 addHook("PlayerSpawn", function(ply)	
 	if objectExists(ply) and objectExists(ply.mo) then
 		if getPlayerBar(ply) == nil then
@@ -16,10 +17,12 @@ addHook("PlayerSpawn", function(ply)
 	end
 end)
 
+--Remove a player's bars if they leave--
 addHook("PlayerQuit", function(ply)
 	removePlyBars(ply)
 end)
 
+--Little function to quickly set a bar's visuals--
 local function setBarFrame(bar, i, hellfire)
 	--Make the bars match the ring states.
 	if hellfire.rings[i].state == "filled" then
@@ -35,6 +38,7 @@ local function setBarFrame(bar, i, hellfire)
 	end
 end
 
+--Main thinking hook for bars (positioning, rendering, etc)--
 addHook("MobjThinker", function(mobj)
 	if objectExists(mobj.target) and objectExists(mobj.target.player) then
 		if mobj.target.player == displayplayer
@@ -113,3 +117,19 @@ addHook("MobjThinker", function(mobj)
 		end
 	end
 end, MT_HFBAR)
+
+--Little ThinkFrame hook to remove any broken bars--
+addHook("ThinkFrame", function()
+	for i,bar in ipairs(HFBars) do
+		--Remove if the bar no longer exists.
+		if not(objectExists(bar)) then
+			table.remove(HFBars, i)
+		end
+
+		--Remove if the target no longer exists.
+		if objectExists(bar) and not(objectExists(bar.target)) then
+			P_RemoveMobj(bar)
+			table.remove(HFBars, i)
+		end
+	end
+end)

@@ -56,19 +56,17 @@ rawset(_G, "resetRings", function(hellfire)
 end)
 
 rawset(_G, "set_hellfireBoolVar", function(ply, var, newVal, replyTbl)
-	local hellfire = ply.hellfireHealth
-
 	local trueTbl = {"true", "1", "on"}
 	local falseTbl = {"false", "0", "off"}
 
 	if table.concat(trueTbl, " "):find(newVal) then
-		hellfire.options[var] = true
+		ply.hellfireHealth.options[var] = true
 
 		if replyTbl ~= nil then
 			CONS_Printf(ply, replyTbl.trueStatement)
 		end
 	elseif table.concat(falseTbl, " "):find(newVal)
-		hellfire.options[var] = false
+	ply.hellfireHealth.options[var] = false
 
 		if replyTbl ~= nil then
 			CONS_Printf(ply, replyTbl.falseStatement)
@@ -79,16 +77,14 @@ rawset(_G, "set_hellfireBoolVar", function(ply, var, newVal, replyTbl)
 end)
 
 rawset(_G, "set_hellfireStrVar", function(ply, var, newVal, valTbl1, valTbl2, replyTbl)
-	local hellfire = ply.hellfireHealth
-
 	if table.concat(valTbl1.values, " "):find(newVal) then
-		hellfire.options[var] = valTbl1.returnVal
+		ply.hellfireHealth.options[var] = valTbl1.returnVal
 
 		if replyTbl ~= nil then
 			CONS_Printf(ply, replyTbl.statement1)
 		end
 	elseif table.concat(valTbl2.values, " "):find(newVal)
-		hellfire.options[var] = valTbl2.returnVal
+		ply.hellfireHealth.options[var] = valTbl2.returnVal
 
 		if replyTbl ~= nil then
 			CONS_Printf(ply, replyTbl.statement2)
@@ -137,15 +133,24 @@ rawset(_G, "modifyClientList", function(skin, tbl)
 	local file = io.openlocal("client/hf_clientList.txt", "w")
 	
 	if decoded[skin] == nil then
-		decoded[skin] = {isBanned=false, shieldHack=false, deathOverride=false}
+		decoded[skin] = {isBanned=false, shieldHack=false, deathOverride=false, noDeathJingle=false}
 	end
 	
+	--Apply to existing settings.
 	for key,val in pairs(decoded[skin]) do
 		if tbl[key] ~= nil then
 			if val ~= tbl[key] then
 				changed = true
 				decoded[skin][key] = tbl[key]
 			end
+		end
+	end
+
+	--Add new settings.
+	for key,val in pairs(tbl) do
+		if decoded[skin][key] == nil then
+			changed = true
+			decoded[skin][key] = tbl[key]
 		end
 	end
 	
@@ -155,44 +160,18 @@ rawset(_G, "modifyClientList", function(skin, tbl)
 	return(changed)
 end)
 
---[[Going to need to revisit these later, I have NO CLUE on how to use io.open properly.
-rawset(_G, "fetchServerList", function()
-	io.open("hf_serverList.txt", "r", function(file)
-		local fileStr = file:read("*a")
-		if fileStr == "" or fileStr == nil then
-			fileStr = "{}"
-		end
-		HFSrvList = hf_json.decode(fileStr)
-		file:close()
-	end)
-	
-	return(true)
-end)
-
-rawset(_G, "flushServerList", function()
-	local decoded = HFSrvList
-	local file = io.openlocal("hf_serverList.txt", "w")
-
-	file:write(hf_json.encode(decoded))
-	file:close()
-	
-	return(true)
-end)
-]]
-
 rawset(_G, "modifyServerList", function(skin, tbl)
 	local changed = false
-	local decoded = HFSrvList
 	
-	if decoded[skin] == nil then
-		decoded[skin] = {isBanned=false}
+	if HFSrvList[skin] == nil then
+		HFSrvList[skin] = {serverBanned=false}
 	end
 	
-	for key,val in pairs(decoded[skin]) do
+	for key,val in pairs(HFSrvList[skin]) do
 		if tbl[key] ~= nil then
 			if val ~= tbl[key] then
 				changed = true
-				decoded[skin][key] = tbl[key]
+				HFSrvList[skin][key] = tbl[key]
 			end
 		end
 	end
@@ -255,7 +234,11 @@ local function checkEquals(line)
 	end
 end
 
-rawset(_G, "savePrefs", function(hellfire)
+rawset(_G, "savePrefs", function(ply)
+	if ply ~= consoleplayer then return end
+
+	local hellfire = ply.hellfireHealth
+
 	local tbl = {}
 	for _,line in pairs(getPrefsRaw()) do
 		if line:find("^#.+$") == nil and #line > 0 and line ~= "\n" then
@@ -279,6 +262,31 @@ rawset(_G, "savePrefs", function(hellfire)
 			table.insert(tbl, line)
 		end
 	end
+
+	--Insert line if missing.
+	for prefName, trueName in pairs(hfPrefsMapping) do
+		local lineFound = false
+		for _,line in pairs(tbl) do
+			if line:lower():find(prefName:lower()) ~= nil then
+				lineFound = true
+				break
+			end
+		end
+
+		if not(lineFound) then
+			if prefName:lower() == "hear death jingle" then
+				table.insert(tbl, 16, "Hear Death Jingle = true #Should be self-explanatory.")
+			elseif prefName:lower() == "ui skin" then
+				table.insert(tbl, 17, "UI Skin = red #The color of the health bars (both HUD and above players).")
+			elseif prefName:lower() == "melted ring" then
+				table.insert(tbl, 18, "Melted Ring = true #Sets if the main/last ring should be melted.")
+			elseif prefName:lower() == "see health bars" then
+				table.insert(tbl, 19, "See Health Bars = true #Should be self-explanatory.")
+			elseif prefName:lower() == "auto save" then
+				table.insert(tbl, 20, "Auto Save = true #Should be self-explanatory.")
+			end
+		end
+	end
 	local newContents = table.concat(tbl, "\n")
 	
 	local file = io.openlocal("client/hf_prefs.txt", "w")
@@ -286,53 +294,22 @@ rawset(_G, "savePrefs", function(hellfire)
 	file:close()
 end)
 
---Skin comparison function for characters using shield hacks for their damage system.
-rawset(_G, "isShieldHackSkin", function(ply)
-	if ply.mo == nil return(true) end
-	
-	local skinList = getClientList()
-	
-	for skin,vals in pairs(skinList) do
-		if ply.mo.skin == skin then
-			return(vals.shieldHack)
-		end
-	end
-
-	return(false)
-end)
-
---Skin comparison function for characters using unique systems for death.
-rawset(_G, "isSpecialDeathSkin", function(ply)
+--Skin comparison function to fetch any specific changes needed.
+rawset(_G, "getSkinVar", function(ply, var)
 	if ply.mo == nil return(true) end
 
 	local skinList = getClientList()
 
 	for skin,vals in pairs(skinList) do
 		if ply.mo.skin == skin then
-			return(vals.deathOverride)
-		end
-	end
-
-	return(false)
-end)
-
---Skin comparison function for automatic blocking.
-rawset(_G, "isBannedSkin", function(ply)
-	if ply.mo == nil return(true) end
-
-	local clientList = getClientList()
-	local serverList = HFSrvList
-	
-	for skin,vals in pairs(clientList) do
-		if ply.mo.skin == skin then
-			return(vals.isBanned)
+			return(vals[var])
 		end
 	end
 
 	if CV_FindVar("hellfire_useSrvList").value == 1 and ply.hellfireHealth.bypassServerList == false then
-		for skin,vals in pairs(serverList) do
+		for skin,vals in pairs(HFSrvList) do
 			if ply.mo.skin == skin then
-				return(vals.isBanned)
+				return(vals[var])
 			end
 		end
 	end
@@ -397,6 +374,8 @@ rawset(_G, "hfMoveMobj", function(mobj, x, y, z)
 end)
 
 rawset(_G, "loadPrefs", function(ply)
+	if ply ~= consoleplayer then ply.hellfireHealth.prefsLoaded = true return end
+
 	local hellfire = ply.hellfireHealth
 
 	for var,val in pairs(getPrefs()) do
@@ -407,7 +386,7 @@ rawset(_G, "loadPrefs", function(ply)
 				finalVal = "red"
 			end
 		end
-		if var == "doDeathJingle" or var == "seeHealth" or var == "autoSave" then
+		if var == "doDeathJingle" or var == "seeHealth" or var == "autoSave" or var == "meltRing" then
 			if finalVal ~= true and finalVal ~= false then
 				CONS_Printf(ply, '\x85"'..tostring(finalVal)..'"'.." isn't a valid option, so it has been set to the default.")
 				finalVal = true
@@ -416,6 +395,8 @@ rawset(_G, "loadPrefs", function(ply)
 
 		hellfire.options[var] = finalVal
 	end
+
+	ply.hellfireHealth.prefsLoaded = true
 end)
 
 --Damage function for mappers.

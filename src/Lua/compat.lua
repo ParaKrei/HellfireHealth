@@ -98,3 +98,39 @@ addHook("PreThinkFrame", function()
 		end
 	end
 end)
+
+--Echoes & Abyss (StephChars v4)--
+addHook("MobjDamage", function(target, cause, src)
+	if objectExists(target) and objectExists(target.player)
+	and target.skin == "echoes"
+	and not (target.player.powers[pw_carry] == CR_NIGHTSMODE or 
+	target.player.powers[pw_carry] == CR_NIGHTSFALL) then
+		--Setup variables for easy access.
+		local ply = target.player
+		local hellfire = ply.hellfireHealth
+		local echoes = ply.echoes
+
+		if echoes ~= nil and hellfire ~= nil and not(hellfire.notAllowed) and not(hellfire.options.disabled) then
+			if (objectExists(echoes.voidorb) or echoes.twirltimer > 0)
+			and echoes.stuncooldown <= 0 then
+				hellfire.dmgOverride = true
+			else
+				if echoes.abyssactive > 1 then
+					hellfire.dmgOverride = true
+				else
+					if hellfire.health > 1 then
+						if echoes.abyssactive == 0 then
+							echoes.abyssactive = 1
+						else
+							echoes.abyssactive = 2
+						end
+					else
+						if echoes.abyssactive > 0 then
+							hellfire.dmgOverride = true
+						end
+					end
+				end
+			end
+		end
+	end
+end)

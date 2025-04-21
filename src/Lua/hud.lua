@@ -64,10 +64,16 @@ local function hudHandler(hudDrawer, ply)
 
 	if not(hellfire.notAllowed) and not(hellfire.options.disabled) then
 		local graphicPrefix = ""
+		local ringType = ""
 		if hellfire.options.skin == "red" then
 			graphicPrefix = "HR"
 		elseif hellfire.options.skin == "yellow" then
 			graphicPrefix = "HY"
+		end
+		if hellfire.options.meltRing then
+			ringType = "MR"
+		else
+			ringType = "SR"
 		end
 
 		--Alpha stuff (for fading in/out the HUD).
@@ -133,7 +139,7 @@ local function hudHandler(hudDrawer, ply)
 		--Stop drawing stuff once the alpha hits the max value.
 		if hellfire.transStuff.overallAlpha < 10 then
 			local healthPlate = hudDrawer.getSpritePatch(graphicPrefix.."HP", hellfire.healthPlate.frame)
-			local mainRing = hudDrawer.getSpritePatch(graphicPrefix.."MR", hellfire.mainRing.frame)
+			local mainRing = hudDrawer.getSpritePatch(graphicPrefix..ringType, hellfire.mainRing.frame)
 			local basePos = hellfire.basePos
 
 			--Death animation for the base-plate.

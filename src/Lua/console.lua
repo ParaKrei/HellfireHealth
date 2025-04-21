@@ -35,6 +35,101 @@ You can fetch the available lists with "list" ("hellfire remove list").
 ]]..'"\x82\bhelp\x80"'..[[ = Prints out this message.
 ]]
 
+local listTxt = [[
+]].."\"\x82\abannedskins\x80\""..[[ (characters that aren't allowed to use the health system)
+]].."\"\x82specialdeath\x80\""..[[ (characters with unique deaths)
+]].."\"\x82shieldhack\x80\""..[[ (characters that use a shield in a hacky way, e.g. Mario Bros.)
+]].."\"\x82nojingle\x80\""..[[ (characters in this list won't play the death jingle)
+]].."\"\x82silentloss\x80\""..[[ (characters in this list won't play the health ring loss sound)]]
+
+--Quick function to change the client list.
+local function changeList(isAdmin, ply, skin, remove, var, listStr)
+	if not(isAdmin) then
+		local hasChanged = modifyClientList(skin:lower(), {[var]=not(remove)})
+		local changedStr = ""
+		local sameStr = ""
+
+		if remove then
+			changedStr = "has been removed from the "..listStr.." list."
+			sameStr = "wasn't in the "..listStr.." list."
+		else
+			changedStr = "has been added to the "..listStr.." list."
+			sameStr = "was already in the "..listStr.." list."
+		end
+
+		if hasChanged then
+			CONS_Printf(ply, "Skin \"\x82"..skin:lower().."\x80\" "..changedStr)
+			ply.hellfireHealth.lastSkin = "" --Reset the lastSkin variable to force the main code to refresh.
+		else
+			CONS_Printf(ply, "Skin \"\x82"..skin:lower().."\x80\" "..sameStr)
+		end
+	else
+		CONS_Printf(ply, "Please use the non-admin command to set this.")
+	end
+end
+
+--Quick function to change the client preferences.
+local function setClientVar(isAdmin, ply, varType, var, val, text, valTbl1, valTbl2)
+	if not(isAdmin) then
+		local lastAutoSave = ply.hellfireHealth.options.autoSave
+
+		if varType:lower() == "bool" then
+			set_hellfireBoolVar(ply, var, val:lower(), text)
+		elseif varType:lower() == "str" then
+			set_hellfireStrVar(ply, var, val:lower(), valTbl1, valTbl2, text)
+		end
+
+		if var == "autoSave" then
+			if lastAutoSave then
+				CONS_Printf(ply, "Saving your settings (you had auto-saving on before you changed it)...")
+				savePrefs(ply.hellfireHealth)
+			end
+		else
+			if ply.hellfireHealth.options.autoSave then
+				CONS_Printf(ply, "Saving your settings...")
+				savePrefs(ply.hellfireHealth)
+			end
+		end
+	else
+		CONS_Printf(ply, "Please use the non-admin command to set this.")
+	end
+end
+
+--Quick function to set the sensitive variables.
+local function setSensVar(isAdmin, ply, var, val, texts, targeted, message)
+	local adminTxt = "\x8B\bAdministrator \x86"..ply.name.."\x80 "
+	
+	if isAdmin then
+		for target in players.iterate() do
+			if targeted ~= nil then
+				if target.name == targeted then
+					set_hellfireBoolVar(target, var, val:lower(), {
+						trueStatement=adminTxt..texts[1].trueStatement.." for you and only you.",
+						falseStatement=adminTxt..texts[1].falseStatement.." for you and only you."
+					})
+
+					if message ~= nil then
+						CONS_Printf(target, "\x85They also left you a message:\x82\n"..message)
+					end
+
+					CONS_Printf(ply, "You set \x85"..targeted.."\x80\b's "..string.format(texts[2], val:lower()))
+
+					return
+				end
+			else
+				set_hellfireBoolVar(target, var, val:lower(), {
+					trueStatement=adminTxt..texts[1].trueStatement..".",
+					falseStatement=adminTxt..texts[1].falseStatement.."."
+				})
+			end
+		end
+
+		CONS_Printf(ply, "You set \x85\bEVERYONE\x80\b's "..string.format(texts[2], val:lower()))
+	else
+		set_hellfireBoolVar(ply, var, val:lower(), texts[3])
+	end
+end
+
 local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 	if arg1 ~= nil then
 		if arg1:lower() == "set" then
@@ -42,201 +137,114 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 				if arg3 ~= nil then
 					if arg2:lower() == "deathjingle" then
 						--Client tweak ONLY; no admin tweaking allowed.
-						if not(isAdmin) then
-							set_hellfireBoolVar(ply, "doDeathJingle", arg3:lower(), {
-								trueStatement="The \x85Hellfire Saga\x80 the death jingle is now \x82\benabled\x80.",
-								falseStatement="The \x85Hellfire Saga\x80 the death jingle is now \x82\bdisabled\x80."
-							})
-
-							if ply.hellfireHealth.options.autoSave then
-								CONS_Printf(ply, "Saving your settings...")
-								savePrefs(ply.hellfireHealth)
-							end
-						else
-							CONS_Printf(ply, "Please use the non-admin command to set this.")
-						end
+						setClientVar(isAdmin, ply, "bool", "doDeathJingle", arg3:lower(), {
+							trueStatement="The \x85Hellfire Saga\x80 death jingle is now \x82\benabled\x80.",
+							falseStatement="The \x85Hellfire Saga\x80 death jingle is now \x82\bdisabled\x80."
+						})
 					elseif arg2:lower() == "skin" then
 						--Client tweak ONLY; no admin tweaking allowed.
-						if not(isAdmin) then
-							set_hellfireStrVar(ply, "skin", arg3:lower(), {returnVal="red", values={"red", "r"}}, {returnVal="yellow", values={"yellow", "y"}}, {
-								statement1="The \x85Hellfire Saga\x80 now uses the color \x82\bred\x80.",
-								statement2="The \x85Hellfire Saga\x80 now uses the color \x82\byellow\x80."
-							})
-
-							if ply.hellfireHealth.options.autoSave then
-								CONS_Printf(ply, "Saving your settings...")
-								savePrefs(ply.hellfireHealth)
-							end
-						else
-							CONS_Printf(ply, "Please use the non-admin command to set this.")
-						end
+						setClientVar(isAdmin, ply, "str", "skin", arg3:lower(), {
+							statement1="The \x85Hellfire Saga\x80 now uses the color \x82\bred\x80.",
+							statement2="The \x85Hellfire Saga\x80 now uses the color \x82\byellow\x80."
+						}, {returnVal="red", values={"red", "r"}}, {returnVal="yellow", values={"yellow", "y"}})
+					elseif arg2:lower() == "meltring" then
+						--Client tweak ONLY; no admin tweaking allowed.
+						setClientVar(isAdmin, ply, "bool", "meltRing", arg3:lower(), {
+							trueStatement="The main ring now uses the \x82\bmelted\x80 version.",
+							falseStatement="The main ring now uses the \x82\bnon-melted\x80 version."
+						})
 					elseif arg2:lower() == "healthbars" then
 						--Client tweak ONLY; no admin tweaking allowed.
-						if not(isAdmin) then
-							set_hellfireBoolVar(ply, "seeHealth", arg3:lower(), {
-								trueStatement="Health bar visibility \x85(for you)\x80 is now \x82\benabled\x80.",
-								falseStatement="Health bar visibility \x85(for you)\x80 is now \x82\bdisabled\x80."
-							})
-
-							if ply.hellfireHealth.options.autoSave then
-								CONS_Printf(ply, "Saving your settings...")
-								savePrefs(ply.hellfireHealth)
-							end
-						else
-							CONS_Printf(ply, "Please use the non-admin command to set this.")
-						end
+						setClientVar(isAdmin, ply, "bool", "seeHealth", arg3:lower(), {
+							trueStatement="Health bar visibility \x85(for you)\x80 is now \x82\benabled\x80.",
+							falseStatement="Health bar visibility \x85(for you)\x80 is now \x82\bdisabled\x80."
+						})
 					elseif arg2:lower() == "autosave" then
 						--Client tweak ONLY; no admin tweaking allowed.
-						if not(isAdmin) then
-							local lastAutoSave = ply.hellfireHealth.options.autoSave
-
-							set_hellfireBoolVar(ply, "autoSave", arg3:lower(), {
-								trueStatement="Auto-saving is now \x82\benabled\x80.",
-								falseStatement="Auto-saving is now \x82\bdisabled\x80."
-							})
-
-							if lastAutoSave then
-								CONS_Printf(ply, "Saving your settings (you had auto-saving on before you changed it)...")
-								savePrefs(ply.hellfireHealth)
-							end
-						else
-							CONS_Printf(ply, "Please use the non-admin command to set this.")
-						end
+						setClientVar(isAdmin, ply, "bool", "autoSave", arg3:lower(), {
+							trueStatement="Auto-saving is now \x82\benabled\x80.",
+							falseStatement="Auto-saving is now \x82\bdisabled\x80."
+						})
 					elseif arg2:lower() == "specialstages" then
-						if isAdmin then
-							for target in players.iterate() do
-								if arg4 ~= nil then
-									if target.name == arg4 then
-										set_hellfireBoolVar(target, "allowOnSpecialStages", arg3:lower(), {
-											trueStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\benabled\x80 the health system on special stages for you and only you.",
-											falseStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\bdisabled\x80 the health system on special stages for you and only you."
-										})
-
-										if message ~= nil then
-											CONS_Printf(target, "\x85They also left you a message:\x82\n"..message)
-										end
-
-										CONS_Printf(ply, "You set \x85"..arg4.."\x80\b's special stage status to \x82"..tostring(target.hellfireHealth.options.allowOnSpecialStages).."\x80.")
-
-										return
-									end
-								else
-									set_hellfireBoolVar(target, "allowOnSpecialStages", arg3:lower(), {
-										trueStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\benabled\x80 the health system on special stages.",
-										falseStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\bdisabled\x80 the health system on special stages."
-									})
-								end
-							end
-
-							CONS_Printf(ply, "You set \x85\bEVERYONE\x80\b's special stage status to \x82"..tostring(ply.hellfireHealth.options.allowOnSpecialStages).."\x80.")
-						else
-							set_hellfireBoolVar(ply, "allowOnSpecialStages", arg3:lower(), {
+						local texts = {
+							{
+								trueStatement="has \x82\benabled\x80 the health system on special stages",
+								falseStatement="has \x82\bdisabled\x80 the health system on special stages"
+							},
+							"special stage status to \x82%s\x80.",
+							{
 								trueStatement="The \x85Hellfire Saga\x80 health system is \x82now allowed\x80 on special stages.",
 								falseStatement="The \x85Hellfire Saga\x80 health system is \x82no longer allowed\x80 on special stages."
-							})
-						end
+							}
+						}
+
+						setSensVar(isAdmin, ply, "allowOnSpecialStages", arg3:lower(), texts, arg4, message)
 					elseif arg2:lower() == "allchars" then
-						if isAdmin then
-							for target in players.iterate() do
-								if arg4 ~= nil then
-									if target.name == arg4 then
-										set_hellfireBoolVar(target, "allowOnAllChars", arg3:lower(), {
-											trueStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\benabled\x80 the health system on all characters for you and only you.",
-											falseStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\bdisabled\x80 the health system on all characters for you and only you."
-										})
-
-										if message ~= nil then
-											CONS_Printf(target, "\x85They also left you a message:\x82\n"..message)
-										end
-
-										CONS_Printf(ply, "You set \x85"..arg4.."\x80\b's all characters status to \x82"..tostring(target.hellfireHealth.options.allowOnAllChars).."\x80.")
-
-										return
-									end
-								else
-									set_hellfireBoolVar(target, "allowOnAllChars", arg3:lower(), {
-										trueStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\benabled\x80 the health system on all characters.",
-										falseStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\bdisabled\x80 the health system on all characters."
-									})
-								end
-							end
-
-							CONS_Printf(ply, "You set \x85\bEVERYONE\x80\b's all characters status to \x82"..tostring(ply.hellfireHealth.options.allowOnAllChars).."\x80.")
-						else
-							set_hellfireBoolVar(ply, "allowOnAllChars", arg3:lower(), {
+						local texts = {
+							{
+								trueStatement="has \x82\benabled\x80 the health system on all characters",
+								falseStatement="has \x82\bdisabled\x80 the health system on all characters"
+							},
+							"all characters status to \x82%s\x80.",
+							{
 								trueStatement="The \x85Hellfire Saga\x80 health system is \x82now allowed\x80 on all characters.",
 								falseStatement="The \x85Hellfire Saga\x80 health system is \x82no longer allowed\x80 on all characters."
-							})
-						end
+							}
+						}
+
+						setSensVar(isAdmin, ply, "allowOnAllChars", arg3:lower(), texts, arg4, message)
 					elseif arg2:lower() == "ringspill" then
-						if isAdmin then
-							for target in players.iterate() do
-								if arg4 ~= nil then
-									if target.name == arg4 then
-										set_hellfireBoolVar(target, "doRingSpill", arg3:lower(), {
-											trueStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\benabled\x80 ring spill mode for you and only you.",
-											falseStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\bdisabled\x80 ring spill mode for you and only you."
-										})
-										ply.hellfireHealth.ringDeficit = 0
-
-										CONS_Printf(ply, "You set \x85"..arg4.."\x80\b's ring spill status to \x82"..tostring(target.hellfireHealth.options.doRingSpill).."\x80.")
-
-										if message ~= nil then
-											CONS_Printf(target, "\x85They also left you a message:\x82\n"..message)
-										end
-
-										return
-									end
-								else
-									set_hellfireBoolVar(target, "doRingSpill", arg3:lower(), {
-										trueStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\benabled\x80 ring spill mode.",
-										falseStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\bdisabled\x80 ring spill mode."
-									})
-									ply.hellfireHealth.ringDeficit = 0
-								end
-							end
-
-							CONS_Printf(ply, "You set \x85\bEVERYONE\x80\b's ring spill status to \x82"..tostring(ply.hellfireHealth.options.doRingSpill).."\x80.")
-						else
-							set_hellfireBoolVar(ply, "doRingSpill", arg3:lower(), {
+						local texts = {
+							{
+								trueStatement="has \x82\benabled\x80 ring spill mode",
+								falseStatement="has \x82\bdisabled\x80 ring spill mode"
+							},
+							"ring spill status to \x82%s\x80.",
+							{
 								trueStatement="The \x85Hellfire Saga\x80 health system is \x82now\x80 in ring spill mode.",
 								falseStatement="The \x85Hellfire Saga\x80 health system is \x82no longer\x80 ring spill mode."
-							})
-							ply.hellfireHealth.ringDeficit = 0
-						end
-					elseif arg2:lower() == "disablesystem" then
-						if isAdmin then
+							}
+						}
+
+						setSensVar(isAdmin, ply, "doRingSpill", arg3:lower(), texts, arg4, message)
+
+						if arg4 ~= nil then
 							for target in players.iterate() do
-								if arg4 ~= nil then
-									if target.name == arg4 then
-										set_hellfireBoolVar(target, "disabled", arg3:lower(), {
-											trueStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\bdisabled\x80 the health system for you and only you.",
-											falseStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\benabled\x80 the health system for you and only you."
-										})
-
-										if message ~= nil then
-											CONS_Printf(target, "\x85They also left you a message:\x82\n"..message)
-										end
-
-										CONS_Printf(ply, "You set \x85"..arg4.."\x80\b's health system status to \x82"..tostring(not(target.hellfireHealth.options.disabled)).."\x80.")
-
-										return
-									end
-								else
-									set_hellfireBoolVar(target, "disabled", arg3:lower(), {
-										trueStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\bdisabled\x80 the health system.",
-										falseStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\benabled\x80 the health system."
-									})
+								if target.name == arg4 then
+									target.hellfireHealth.ringDeficit = 0
 								end
 							end
-
-							CONS_Printf(ply, "You set \x85\bEVERYONE\x80\b's health system status to \x82"..tostring(not(ply.hellfireHealth.options.disabled)).."\x80.")
 						else
-							set_hellfireBoolVar(ply, "disabled", arg3:lower(), {
+							ply.hellfireHealth.ringDeficit = 0
+						end
+					elseif arg2:lower() == "keephp" then
+						local texts = {
+							{
+								trueStatement="\x82\benabled\x80 the ability to carry health between levels",
+								falseStatement="\x82\bdisabled\x80 the ability to carry health between levels"
+							},
+							"ability to carry health between zones status to \x82%s\x80.",
+							{
+								trueStatement="Health will \x82now\x80 carry between levels.",
+								falseStatement="Health will \x82no longer\x80 carry between levels."
+							}
+						}
+	
+						setSensVar(isAdmin, ply, "keepHealth", arg3:lower(), texts, arg4, message)
+					elseif arg2:lower() == "disablesystem" then
+						local texts = {
+							{
+								trueStatement="has \x82\bdisabled\x80 the health system",
+								falseStatement="has \x82\benabled\x80 the health system"
+							},
+							"health system status to \x82%s\x80.",
+							{
 								trueStatement="The \x85Hellfire Saga\x80 health system is \x82now disabled\x80.",
 								falseStatement="The \x85Hellfire Saga\x80 health system is \x82now enabled\x80."
-							})
-						end
+							}
+						}
+	
+						setSensVar(isAdmin, ply, "disabled", arg3:lower(), texts, arg4, message)
 					else
 						CONS_Printf(ply, '\x85"'..arg2:lower()..'"'.." is NOT a valid variable!")
 					end
@@ -248,6 +256,10 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 					CONS_Printf(ply, "\"\x82\bskin\x80\" = Sets the color of the rings and \"HP\" text;")
 					CONS_Printf(ply, "[either: red/r or yellow/y; not case-sensitive].")
 					CONS_Printf(ply, "\x85This setting is affected by auto-save!")
+
+					CONS_Printf(ply, "\"\x82\bmeltring\x80\" = Sets if the main/last ring is melted or not;")
+					CONS_Printf(ply, "[either: true or false].")
+					CONS_Printf(ply, "\x85This setting is affected by auto-save!")
 					
 					CONS_Printf(ply, "\"\x82\bhealthbars\x80\" = Set if you can see the health bars above players;")
 					CONS_Printf(ply, "[either: true or false].")
@@ -256,17 +268,20 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 					CONS_Printf(ply, "\"\x82\bautosave\x80\" = Set if your preferences will save for you;")
 					CONS_Printf(ply, "[either: true or false].")
 					CONS_Printf(ply, "\x85This setting is affected by auto-save (but it checks the last setting it was on)!")
-
+					
 					CONS_Printf(ply, "\"\x82\bspecialstages\x80\" = Sets if the health system works in special stages;")
 					CONS_Printf(ply, "(NiGHTs stages, multiplayer special stages, etc.) [either: true or false].")
-
+					
 					CONS_Printf(ply, "\"\x82\ballchars\x80\" = Sets if the health system works with all characters;")
 					CONS_Printf(ply, "(allows usage on characters like Takis and Samus) [either: true or false].")
-
+					
 					CONS_Printf(ply, "\"\x82\bringspill\x80\" = Enables a unique system that allows ring spills,")
 					CONS_Printf(ply, "but upon ring loss, you will enter a ring deficit that increases with how much health you've lost.")
 					CONS_Printf(ply, "In order to gain health again, you must get the ring deficit back to zero,")
 					CONS_Printf(ply, "there is a counter below the health plate that shows your current ring deficit [either: true or false].")
+					
+					CONS_Printf(ply, "\"\x82\bkeephp\x80\" = Sets if the health system keeps the states progress on all rings between levels;")
+					CONS_Printf(ply, "[either: true or false].")
 
 					CONS_Printf(ply, "\"\x82\bdisablesystem\x80\" = Sets if the system should be enabled;")
 					CONS_Printf(ply, "it's name is pretty self-explanatory [either: true or false].")
@@ -283,7 +298,7 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 				CONS_Printf(ply, "======================================================")
 				CONS_Printf(ply, "ADDITIONAL NOTES FOR ADMINISTRATORS:")
 				CONS_Printf(ply, "======================================================")
-				CONS_Printf(ply, "You CAN NOT mess with a player's death jingle, skin, health bar visibility, their client list, or if their preferences auto-save, as that's their preference.")
+				CONS_Printf(ply, "You CAN NOT mess with a player's death jingle, skin, main ring skin, health bar visibility, their client list, or if their preferences auto-save, as that's their preference.")
 				CONS_Printf(ply, "There is a fourth (optional) argument [second if command is short] for this version,\nwhich allows you to modify a specific player's values.\nIt is case sensitive.")
 				CONS_Printf(ply, "There is also a fifth (optional) argument [third if command is short] for this version,\nwhich allows you to send a message to the player in the fourth argument.")
 				CONS_Printf(ply, "You can also set the max health and fill amount for individual players via the \"maxHealth\" and \"fillCap\" commands.")
@@ -291,105 +306,64 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 				CONS_Printf(ply, "The syntax/formatting for this admin command is:\nhellfire_admin <cmd> <player name> <value> <optional message> (name is case-sensitive).")
 			end
 		elseif arg1:lower() == "disable" then
-			if isAdmin then
-				for target in players.iterate() do
-					if arg2 ~= nil then
-						if target.name == arg2 then
-							set_hellfireBoolVar(target, "disabled", "true", {
-								trueStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\bdisabled\x80 the health system for you and only you.",
-								falseStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\benabled\x80 the health system for you and only you."
-							})
-
-							if arg3 ~= nil then
-								CONS_Printf(target, "\x85They also left you a message:\x82\n"..arg3)
-							end
-
-							CONS_Printf(ply, "You set \x85"..arg2.."\x80\b's health system to \x82\bdisabled\x80.")
-
-							return
-						end
-					else
-						set_hellfireBoolVar(target, "disabled", "true", {
-							trueStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\bdisabled\x80 the health system.",
-							falseStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\benabled\x80 the health system."
-						})
-					end
-				end
-
-				CONS_Printf(ply, "You set \x85\bEVERYONE\x80\b's health system to \x82\bdisabled\x80.")
-			else
-				set_hellfireBoolVar(ply, "disabled", "true", {
+			local texts = {
+				{
+					trueStatement="has \x82\bdisabled\x80 the health system",
+					falseStatement="has \x82\benabled\x80 the health system"
+				},
+				"health system status to \x82%s\x80.",
+				{
 					trueStatement="The \x85Hellfire Saga\x80 health system is \x82now disabled\x80.",
 					falseStatement="The \x85Hellfire Saga\x80 health system is \x82now enabled\x80."
-				})
-			end
+				}
+			}
+
+			setSensVar(isAdmin, ply, "disabled", "true", texts, arg2, message)
 		elseif arg1:lower() == "enable" then
-			if isAdmin then
-				for target in players.iterate() do
-					if arg2 ~= nil then
-						if target.name == arg2 then
-							set_hellfireBoolVar(target, "disabled", "false", {
-								trueStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\bdisabled\x80 the health system for you and only you.",
-								falseStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\benabled\x80 the health system for you and only you."
-							})
-
-							if arg3 ~= nil then
-								CONS_Printf(target, "\x85They also left you a message:\x82\n"..arg3)
-							end
-
-							CONS_Printf(ply, "You set \x85"..arg2.."\x80\b's health system to \x82\benabled\x80.")
-
-							return
-						end
-					else
-						set_hellfireBoolVar(target, "disabled", "false", {
-							trueStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\bdisabled\x80 the health system.",
-							falseStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\benabled\x80 the health system."
-						})
-					end
-				end
-
-				CONS_Printf(ply, "You set \x85\bEVERYONE\x80\b's health system to \x82\benabled\x80.")
-			else
-				set_hellfireBoolVar(ply, "disabled", "false", {
+			local texts = {
+				{
+					trueStatement="has \x82\bdisabled\x80 the health system",
+					falseStatement="has \x82\benabled\x80 the health system"
+				},
+				"health system status to \x82%s\x80.",
+				{
 					trueStatement="The \x85Hellfire Saga\x80 health system is \x82now disabled\x80.",
 					falseStatement="The \x85Hellfire Saga\x80 health system is \x82now enabled\x80."
-				})
-			end
+				}
+			}
+
+			setSensVar(isAdmin, ply, "disabled", "false", texts, arg2, message)
 		elseif arg1:lower() == "spillmode" then
-			if isAdmin then
+			local newVal = tostring(not(ply.hellfireHealth.options.doRingSpill))
+			if arg2 ~= nil then
 				for target in players.iterate() do
-					if arg2 ~= nil then
-						if target.name == arg2 then
-							set_hellfireBoolVar(target, "doRingSpill", tostring(not(target.hellfireHealth.options.doRingSpill)), {
-								trueStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\benabled\x80 ring spill mode for you and only you.",
-								falseStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\bdisabled\x80 ring spill mode for you and only you."
-							})
-							ply.hellfireHealth.ringDeficit = 0
-
-							if arg3 ~= nil then
-								CONS_Printf(target, "\x85They also left you a message:\x82\n"..arg3)
-							end
-
-							CONS_Printf(ply, "You set \x85"..arg2.."\x80\b's ring spill mode to \x82"..tostring(target.hellfireHealth.options.doRingSpill).."\x80.")
-
-							return
-						end
-					else
-						set_hellfireBoolVar(target, "doRingSpill", tostring(not(target.hellfireHealth.options.doRingSpill)), {
-							trueStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\benabled\x80 ring spill mode.",
-							falseStatement="\x8B\bAdministrator \x86"..ply.name.."\x80 has \x82\bdisabled\x80 ring spill mode."
-						})
-						ply.hellfireHealth.ringDeficit = 0
+					if target.name == arg2 then
+						newVal = tostring(not(target.hellfireHealth.options.doRingSpill))
 					end
 				end
+			end
 
-				CONS_Printf(ply, "You set \x85\bEVERYONE\x80\b's ring spill mode to \x82"..tostring(ply.hellfireHealth.options.doRingSpill).."\x80.")
-			else
-				set_hellfireBoolVar(ply, "doRingSpill", tostring(not(ply.hellfireHealth.options.doRingSpill)), {
+			local texts = {
+				{
+					trueStatement="has \x82\benabled\x80 ring spill mode",
+					falseStatement="has \x82\bdisabled\x80 ring spill mode"
+				},
+				"ring spill status to \x82%s\x80.",
+				{
 					trueStatement="The \x85Hellfire Saga\x80 health system is \x82now\x80 in ring spill mode.",
 					falseStatement="The \x85Hellfire Saga\x80 health system is \x82no longer\x80 ring spill mode."
-				})
+				}
+			}
+
+			setSensVar(isAdmin, ply, "doRingSpill", newVal, texts, arg2, message)
+
+			if arg2 ~= nil then
+				for target in players.iterate() do
+					if target.name == arg2 then
+						target.hellfireHealth.ringDeficit = 0
+					end
+				end
+			else
 				ply.hellfireHealth.ringDeficit = 0
 			end
 		elseif arg1:lower() == "maxhealth" and isAdmin then
@@ -524,14 +498,24 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 						local skinStr = skin+": "
 						local bannedStr = "is a banned skin? "+tostring(vals.isBanned)+", "
 						local sldhckStr = "uses a shield hack? "+tostring(vals.shieldHack)+", "
-						local dthovrStr = "overrides normal death? "+tostring(vals.deathOverride)
+						local dthovrStr = "overrides normal death? "+tostring(vals.deathOverride)+", "
+						local dthjngStr = "ignores death jingle? "+tostring(vals.noDeathJingle)
 
-						printStr = $+skinStr+bannedStr+sldhckStr+dthovrStr+"\n"
+						printStr = $+skinStr+bannedStr+sldhckStr+dthovrStr+dthjngStr+"\n"
 					end
 
 					CONS_Printf(ply, "Here's the entries found within the client list:\n"+printStr:sub(0, #printStr-1))
 				elseif arg2:lower() == "serverlist" then
-					CONS_Printf(ply, "WIP")
+					local printStr = ""
+
+					for skin,vals in pairs(HFSrvList) do
+						local skinStr = skin+": "
+						local bannedStr = "is server banned? "+tostring(vals.isBanned)
+
+						printStr = $+skinStr+bannedStr+"\n"
+					end
+
+					CONS_Printf(ply, "Here's the entries found within the server list:\n"+printStr:sub(0, #printStr-1))
 				elseif arg2:lower() == "list" then
 					CONS_Printf(ply, "Here are the values you can get:\n\"\x82\aclientlist\x80\" (the list of skins that are just for you :))\n\"\x82serverlist\x80\" (the lists of skins for everyone)")
 				else
@@ -545,49 +529,22 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 				if arg3 ~= nil then
 					if arg2:lower() == "bannedskins" then
 						--Client tweak ONLY; no admin tweaking allowed.
-						if not(isAdmin) then
-							local hasChanged = modifyClientList(arg3:lower(), {isBanned=true})
-
-							if hasChanged then
-								CONS_Printf(ply, "Skin \"\x82"..arg3:lower().."\x80\" has been added to the banned list.")
-								ply.hellfireHealth.lastSkin = "" --Reset the lastSkin variable to force the main code to refresh.
-							else
-								CONS_Printf(ply, "Skin \"\x82"..arg3:lower().."\x80\" was already in the banned list.")
-							end
-						else
-							CONS_Printf(ply, "Please use the non-admin command to set this.")
-						end
+						changeList(isAdmin, ply, arg3:lower(), false, "isBanned", "banned")
 					elseif arg2:lower() == "specialdeath" then
 						--Client tweak ONLY; no admin tweaking allowed.
-						if not(isAdmin) then
-							local hasChanged = modifyClientList(arg3:lower(), {deathOverride=true})
-
-							if hasChanged then
-								CONS_Printf(ply, "Skin \"\x82"..arg3:lower().."\x80\" has been added to the special death list.")
-								ply.hellfireHealth.lastSkin = "" --Reset the lastSkin variable to force the main code to refresh.
-							else
-								CONS_Printf(ply, "Skin \"\x82"..arg3:lower().."\x80\" was already in the special death list.")
-							end
-						else
-							CONS_Printf(ply, "Please use the non-admin command to set this.")
-						end
+						changeList(isAdmin, ply, arg3:lower(), false, "deathOverride", "special death")
 					elseif arg2:lower() == "shieldhack" then
 						--Client tweak ONLY; no admin tweaking allowed.
-						if not(isAdmin) then
-							local hasChanged = modifyClientList(arg3:lower(), {shieldHack=true})
-
-							if hasChanged then
-								CONS_Printf(ply, "Skin \"\x82"..arg3:lower().."\x80\" has been added to the shield hack list.")
-								ply.hellfireHealth.lastSkin = "" --Reset the lastSkin variable to force the main code to refresh.
-							else
-								CONS_Printf(ply, "Skin \"\x82"..arg3:lower().."\x80\" was already in the shield hack list.")
-							end
-						else
-							CONS_Printf(ply, "Please use the non-admin command to set this.")
-						end
+						changeList(isAdmin, ply, arg3:lower(), false, "shieldHack", "shield hack")
+					elseif arg2:lower() == "nojingle" then
+						--Client tweak ONLY; no admin tweaking allowed.
+						changeList(isAdmin, ply, arg3:lower(), false, "noDeathJingle", "no death jingle")
+					elseif arg2:lower() == "silentloss" then
+						--Client tweak ONLY; no admin tweaking allowed.
+						changeList(isAdmin, ply, arg3:lower(), false, "silentLoss", "silent loss")
 					elseif arg2:lower() == "serverban" then --Server list
 						if isAdmin then
-							local hasChanged = modifyServerList(arg3:lower(), {isBanned=true})
+							local hasChanged = modifyServerList(arg3:lower(), {serverBanned=true})
 
 							if hasChanged then
 								print("\x85\bTHE SKIN\x80 \"\x82"..arg3:lower().."\x80\" \x85\bHAS BEEN SERVER BANNED FROM USING HELLFIRE HEALTH.\x80")
@@ -605,11 +562,10 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 						CONS_Printf(ply, '\x85"'..arg2:lower()..'"'.." is NOT a valid variable!")
 					end
 				elseif arg2:lower() == "list" then
-					CONS_Printf(ply, "Here are the lists you can add a character to:\n\"\x82\abannedskins\x80\" (characters that aren't allowed to use the health system)")
-					CONS_Printf(ply, "\"\x82specialdeath\x80\" (characters with unique deaths)")
-					CONS_Printf(ply, "\"\x82shieldhack\x80\" (characters that use a shield in a hacky way, e.g. Mario Bros.)")
+					CONS_Printf(ply, "Here are the lists you can add a character to:")
+					CONS_Printf(ply, listTxt)
 				else
-					CONS_Printf(ply, "\x85You can't add nothing.")
+					CONS_Printf(ply, "\x85You can't add to nothing.")
 				end
 			else
 				CONS_Printf(ply, "\x85You need to put in a variable name to add anything to it!")
@@ -619,49 +575,22 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 				if arg3 ~= nil then
 					if arg2:lower() == "bannedskins" then
 						--Client tweak ONLY; no admin tweaking allowed.
-						if not(isAdmin) then
-							local hasChanged = modifyClientList(arg3:lower(), {isBanned=false})
-
-							if hasChanged then
-								CONS_Printf(ply, "Skin \"\x82"..arg3:lower().."\x80\" has been removed from the banned list.")
-								ply.hellfireHealth.lastSkin = "" --Reset the lastSkin variable to force the main code to refresh.
-							else
-								CONS_Printf(ply, "Skin \"\x82"..arg3:lower().."\x80\" wasn't in the banned list.")
-							end
-						else
-							CONS_Printf(ply, "Please use the non-admin command to set this.")
-						end
+						changeList(isAdmin, ply, arg3:lower(), true, "isBanned", "banned")
 					elseif arg2:lower() == "specialdeath" then
 						--Client tweak ONLY; no admin tweaking allowed.
-						if not(isAdmin) then
-							local hasChanged = modifyClientList(arg3:lower(), {deathOverride=false})
-
-							if hasChanged then
-								CONS_Printf(ply, "Skin \"\x82"..arg3:lower().."\x80\" has been removed from the special death list.")
-								ply.hellfireHealth.lastSkin = "" --Reset the lastSkin variable to force the main code to refresh.
-							else
-								CONS_Printf(ply, "Skin \"\x82"..arg3:lower().."\x80\" wasn't in the special death list.")
-							end
-						else
-							CONS_Printf(ply, "Please use the non-admin command to set this.")
-						end
+						changeList(isAdmin, ply, arg3:lower(), true, "deathOverride", "special death")
 					elseif arg2:lower() == "shieldhack" then
 						--Client tweak ONLY; no admin tweaking allowed.
-						if not(isAdmin) then
-							local hasChanged = modifyClientList(arg3:lower(), {shieldHack=false})
-
-							if hasChanged then
-								CONS_Printf(ply, "Skin \"\x82"..arg3:lower().."\x80\" has been removed from the shield hack list.")
-								ply.hellfireHealth.lastSkin = "" --Reset the lastSkin variable to force the main code to refresh.
-							else
-								CONS_Printf(ply, "Skin \"\x82"..arg3:lower().."\x80\" wasn't in the shield hack list.")
-							end
-						else
-							CONS_Printf(ply, "Please use the non-admin command to set this.")
-						end
+						changeList(isAdmin, ply, arg3:lower(), true, "shieldHack", "shield hack")
+					elseif arg2:lower() == "nojingle" then
+						--Client tweak ONLY; no admin tweaking allowed.
+						changeList(isAdmin, ply, arg3:lower(), true, "noDeathJingle", "no death jingle")
+					elseif arg2:lower() == "silentloss" then
+						--Client tweak ONLY; no admin tweaking allowed.
+						changeList(isAdmin, ply, arg3:lower(), true, "silentLoss", "silent loss")
 					elseif arg2:lower() == "serverban" then --Server list
 						if isAdmin then
-							local hasChanged = modifyServerList(arg3:lower(), {isBanned=false})
+							local hasChanged = modifyServerList(arg3:lower(), {serverBanned=false})
 
 							if hasChanged then
 								print("\x85\bTHE SKIN\x80 \"\x82"..arg3:lower().."\x80\" \x85\bIS NO LONGER SERVER BANNED FROM USING HELLFIRE HEALTH.\x80")
@@ -679,9 +608,10 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 						CONS_Printf(ply, '\x85"'..arg2:lower()..'"'.." is NOT a valid variable!")
 					end
 				elseif arg2:lower() == "list" then
-					CONS_Printf(ply, "Here are the lists you can remove a character from:\n\"\x82\abannedskins\x80\" (characters that aren't allowed to use the health system)\n\"\x82specialdeath\x80\" (characters with unique deaths)\n\"\x82shieldhack\x80\" (characters that use a shield in a hacky way, e.g. Mario Bros.)")
+					CONS_Printf(ply, "Here are the lists you can remove a character from:")
+					CONS_Printf(ply, listTxt)
 				else
-					CONS_Printf(ply, "\x85You can't remove nothing.")
+					CONS_Printf(ply, "\x85You can't remove from nothing.")
 				end
 			else
 				CONS_Printf(ply, "\x85You need to put in a variable name to remove anything to it!")
@@ -689,7 +619,7 @@ local function hfCMD(isAdmin, ply, arg1, arg2, arg3, arg4, message)
 		elseif arg1:lower() == "save" then
 			if not(isAdmin) then
 				CONS_Printf(ply, "\x85Saving your settings!")
-				savePrefs(ply.hellfireHealth)
+				savePrefs(ply)
 			else
 				CONS_Printf(ply, "Please use the non-admin command.")
 			end
