@@ -29,7 +29,7 @@ addHook("MobjDeath", function(target)
 			--I couldn't find a way to consistantly exit with just one player,
 			--so everyone gets the timer.
 			for ply in players.iterate() do
-				ply.exiting = (2*TICRATE)+3
+				ply.exiting = (2*TICRATE)+(TICRATE/2)+15
 			end
 		end
 	end
