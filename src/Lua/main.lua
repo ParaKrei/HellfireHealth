@@ -1,5 +1,5 @@
 --[[
-The main file where the actual health system lives.
+	The main file where the actual health system lives.
 ]]
 
 --Initalize the table.
@@ -13,10 +13,13 @@ local function initHellfire(ply)
 				allowOnAllChars = false,
 				doRingSpill = false,
 				keepHealth = false,
+				fillOnly = false,
+				adminLock = false,
 				doDeathJingle = true,
 				skin = "red",
 				meltRing = true,
 				seeHealth = true,
+				presetNum = 1,
 				autoSave = true
 			},
 			notAllowed = false,
@@ -24,24 +27,24 @@ local function initHellfire(ply)
 			maxHealth = 5,
 			fillCap = 5,
 			health = 0,
+			tookDmg = false,
 			lastVals = {
 				maxHealth = 0,
 				fillCap = 0,
 				health = 0,
-				curRing = 0,
 				rings = {},
 				lastRingCount = ply.rings
 			},
 			ringDeficit = 0,
 			ringDefColor = V_YELLOWMAP,
-			curRing = 0,
-			basePos = {x=hudinfo[HUD_RINGS].x-1, y=hudinfo[HUD_RINGS].y+15}, --Get the position of the og "RINGS" HUD element and position off of that.
-			mainRing = {frame=0, isAnimating=false, animDone=false},
-			healthPlate = {frame=0, isAnimating=false, animDone=false},
+			basePos = {x=-16, y=50},
+			mainRing = {frame=0, isAnimating=false, animDone=false, lastTic=nil},
+			healthPlate = {frame=0, isAnimating=false, animDone=false, lastTic=nil},
 			rings = {},
 			ringXOffset = 0,
-			ringWrapAt = 0,
-			ringWrapAt2 = 0,
+			ringYOffset = ((16/2)+1),
+			ringWrapAt = 8,
+			ringWrapOffset = 0,
 			ringWrapCount = 0,
 			endWidth = 1,
 			isDead = false,
@@ -61,11 +64,31 @@ local function initHellfire(ply)
 				silentLoss=false,
 				serverBanned=false,
 			},
+			allowOverride = false,
 			dmgOverride = false,
-			deathOverride = false
+			deathOverride = false,
+			healOverride = false,
+			hudposGUI = {
+				visible = false,
+				lastInputTime = 0,
+				lastGC = {},
+				lastMButtons = {},
+				lockedCamAngles = {angleturn=0, aiming=0},
+				priority = 0,
+				boundingBox = {x={0,0}, y={0,0}, scale={x=0,y=0}},
+				dragging = false,
+				grabPoint = {x=0, y=0},
+				previewRingCount = 5,
+				ogPresetNum = 0
+			}
 		}
 	end
 	local hellfire = ply.hellfireHealth
+
+	--Fetch the client's preferences and apply.
+	if hellfire.prefsLoaded == false then
+		hf.loadPrefs(ply)
+	end
 
 	--Reset stuff.
 	hellfire.isDead = false
@@ -79,35 +102,27 @@ local function initHellfire(ply)
 	hellfire.transStuff.overallAlpha = 1
 	hellfire.transStuff.isFadingHUD = false
 
-	--Move the HUD to the position of the score text if BattleMod or RSR is loaded.
-	if CBW_Battle ~= nil or (RingslingerRev ~= nil and RingslingerRev.GamemodeActive) then
-		hellfire.basePos.y = hudinfo[HUD_RINGS].y+34
-	end
-
 	--Store the old values for keepHealth.
 	hellfire.lastVals.maxHealth = hellfire.maxHealth
 	hellfire.lastVals.fillCap = hellfire.fillCap
 	hellfire.lastVals.health = hellfire.health
-	hellfire.lastVals.curRing = hellfire.curRing
 	hellfire.lastVals.rings = hellfire.rings
 
 	--Fetch the cvars and set them.
 	hellfire.maxHealth = CV_FindVar("hellfire_maxHealth").value
 	hellfire.fillCap = CV_FindVar("hellfire_fillCap").value
 
-	--Setup the health and curRing since it can't be done at define.
+	--Setup the health since it can't be done at define.
 	hellfire.health = hellfire.maxHealth
-	hellfire.curRing = hellfire.maxHealth-1
 
 	--Setup the rings.
-	resetRings(hellfire)
+	hf.resetRings(hellfire)
 
 	--Restore the old values if using keepHealth (need to check if the old values are valid).
 	if hellfire.options.keepHealth
 	and (hellfire.lastVals.maxHealth > 0
 	and hellfire.lastVals.fillCap > 0
 	and hellfire.lastVals.health > 0
-	and hellfire.lastVals.curRing > 0
 	and hellfire.lastVals.rings ~= {}) then
 		if hellfire.lastVals.maxHealth ~= hellfire.maxHealth then
 			--Calculate difference ratio from og values to apply to the new one.
@@ -117,13 +132,7 @@ local function initHellfire(ply)
 			hellfire.health = hellfire.lastVals.health
 		end
 		
-		hellfire.curRing = hellfire.lastVals.curRing
 		hellfire.rings = hellfire.lastVals.rings
-	end
-
-	--Fetch the client's preferences and apply.
-	if hellfire.prefsLoaded == false then
-		loadPrefs(ply)
 	end
 end
 
@@ -131,16 +140,7 @@ local function killPlayer(hellfire, healthLoss, target, cause, src, dmgType)
 	local ply = target.player
 
 	hellfire.isDead = true
-	hellfire.curRing = 1
 	hellfire.health = 0
-	for i=1,#hellfire.rings do
-		hellfire.rings[i].state = "empty"
-		hellfire.rings[i].fillAmt = 0
-		hellfire.rings[i].doFlash = false
-		if hellfire.rings[i].state ~= "empty" then
-			hellfire.rings[i].doShrivel = true
-		end
-	end
 	
 	if healthLoss then
 		hellfire.diedFromHealthLoss = true --Done to ensure nothing occurs twice.
@@ -160,33 +160,25 @@ end
 
 --Damage handler.
 local function dmgHandler(target, cause, src, dmg, dmgType)
-	if objectExists(target) == false then return end --Non-valid checker
+	if hf.objectExists(target) == false then return end --Non-valid checker
 	if target.player.bot > 0 and CV_FindVar("hellfire_botEnable").value == 0 then return end --Don't execute for bots if not allowed.
+
+	--Inject compatibility hooks, since adding them in afterwards won't let me override it.
+	if hf.compat.MobjDamage ~= nil
+		for _,func in pairs(hf.compat.MobjDamage) do
+			func(target, cause, src, dmg, dmgType)
+		end
+	end
 
 	--Setup variables for easy access.
 	local ply = target.player
 	local hellfire = ply.hellfireHealth
 
-	--Handy little override variable for the compat stuff.
-	if hellfire.dmgOverride then ply.hellfireHealth.dmgOverride = false return true end
-
-	--Battle Overrides
-	if CBW_Battle ~= nil then
-		local battle = CBW_Battle
-
-		if battle.GuardTrigger(target, cause, src, dmg, dmgType) then
-			return true
-		end
-	end
-
-	if not(hellfire.notAllowed) and not(hellfire.options.disabled) then
-		--Setup the ring variables.
-		local targetRing = hellfire.rings[hellfire.curRing]
-		local ringAhead = hellfire.rings[hellfire.curRing+1]
-
+	if not(hellfire.notAllowed) and not(hellfire.options.disabled) and not(hellfire.dmgOverride) then
 		--Stop Fang (and any others like him) from spamming the player to death.
-		--Also put in checks for invuln and super.
-		if ply.powers[pw_flashing] <= 0 and ply.powers[pw_invulnerability] <= 0 and ply.powers[pw_super] <= 0 then
+		--Also put in checks for invuln, super, and strong guard.
+		if hf.canPlayerBeHurt(ply) and not(hellfire.tookDmg) then
+			hellfire.tookDmg = true
 			--Remove/damage the shield if it exists instead (also some special exceptions for characters like the Mario Bros to get around their shield hack).
 			if ply.powers[pw_shield] ~= SH_NONE and not(hellfire.skinInfo.shieldHack) then
 				--Why did I try to recreate the shield damage code? This is SO much easier, smaller, and more reliable!
@@ -199,6 +191,7 @@ local function dmgHandler(target, cause, src, dmg, dmgType)
 					--Hurt code.
 					P_DoPlayerPain(ply, src, cause)
 					hurtMessages(target, cause, src, dmgType)
+					P_ResetPlayer(ply) --Reset player call.
 
 					--Play the health ring loss sfx.
 					if not(hellfire.skinInfo.silentLoss) then
@@ -236,20 +229,6 @@ local function dmgHandler(target, cause, src, dmg, dmgType)
 					--Health stuff.
 					if hellfire.health > 1 then
 						hellfire.health = $-1
-						targetRing.fillAmt = 0
-						targetRing.state = "empty"
-						targetRing.doShrivel = true --Do ring loss animation
-						if ringAhead ~= nil and ringAhead.fillAmt > 0 then --Remove any progress on next ring.
-							ringAhead.fillAmt = 0
-						end
-
-						--Get the next ring to fill.
-						if getRingWithState(hellfire, "filled") == nil then
-							hellfire.curRing = getRingWithState(hellfire, "empty", true)
-						else
-							hellfire.curRing = getRingWithState(hellfire, "filled")
-						end
-
 						hellfire.transStuff.doFade = true
 					end
 				end
@@ -257,29 +236,34 @@ local function dmgHandler(target, cause, src, dmg, dmgType)
 		else
 			--Duplicate P_DoPlayerPain to replicate stock behavior better (Fang's cork gun doing knockback no matter what).
 			P_DoPlayerPain(ply, src, cause)
+			P_ResetPlayer(ply) --Reset player call.
 		end
 
 		--Stop the rest of the OG damage code.
 		return true
 	end
+
+	ply.hellfireHealth.dmgOverride = false
 end
 
 --Little death handler for anything that instantly kills the player.
 local function deathHandler(target, cause, src, dmgType)
-	if objectExists(target) == false then return end --Non-valid checker
+	if hf.objectExists(target) == false then return end --Non-valid checker
 	if target.player.bot > 0 and CV_FindVar("hellfire_botEnable").value == 0 then return end --Don't execute for bots if not allowed.
+
+	--Inject compatibility hooks, since adding them in afterwards won't let me override it.
+	if hf.compat.MobjDeath ~= nil
+		for _,func in pairs(hf.compat.MobjDeath) do
+			func(target, cause, src, dmg, dmgType)
+		end
+	end
 
 	--Setup variables for easy access.
 	local ply = target.player
 	local hellfire = ply.hellfireHealth
 
-	--Handy little override variable for the compat stuff.
-	if hellfire.deathOverride then ply.hellfireHealth.deathOverride = false return end
-
-	if not(hellfire.notAllowed) and not(hellfire.options.disabled) then
+	if not(hellfire.notAllowed) and not(hellfire.options.disabled) and not(hellfire.deathOverride) then
 		--Setup the ring variables.
-		local targetRing = hellfire.rings[hellfire.curRing]
-		local ringAhead = hellfire.rings[hellfire.curRing+1]
 		local instaDeath = dmgType == DMG_INSTAKILL or dmgType == DMG_DEATHPIT or dmgType == DMG_CRUSHED or dmgType == DMG_DROWNED or dmgType == DMG_SPACEDROWN or dmgType == DMG_DEATHMASK
 
 		if (instaDeath or hellfire.diedFromHealthLoss == false) and not(hellfire.skinInfo.deathOverride) then
@@ -290,117 +274,212 @@ local function deathHandler(target, cause, src, dmgType)
 			ply.deadtimer = $-TICRATE --The death jingle is just short enough for this to work.
 		end
 	end
+
+	ply.hellfireHealth.deathOverride = false
 end
 
---Function to handle refilling health; can handle any ring collections that go above five in one tic (like ring monitors).
-local function healthRefillHandler(ply, instaFill, ringsAdded)
+--Function to handle refilling health; can handle any ring collections that go above the fill cap in one tic (like ring monitors).
+local function healthRefillHandler(ply, ringsAdded)
 	local hellfire = ply.hellfireHealth
 
-	--If there is a ring deficit, put the collected rings towards it instead.
-	if hellfire.options.doRingSpill and hellfire.ringDeficit > 0 then
-		hellfire.ringDeficit = $-ringsAdded
-		return
-	end
+	local instaFill = ringsAdded >= hellfire.fillCap
+	if hellfire.fillCap == 1 then instaFill = ringsAdded > 1 end --Special case for a fill cap of one.
 
-	--Fetch target health ring.
-	local targetRing = hellfire.rings[hellfire.curRing+1]
-	if targetRing == nil or hellfire.rings[hellfire.curRing].state == "empty" then
-		targetRing = hellfire.rings[hellfire.curRing]
-	end
-
-	local healthBefore = hellfire.health --A bit janky, but it works.
-	if hellfire.health < hellfire.maxHealth then --No overheal.
-		if instaFill then --Handle any ring changes above five in a tic.
-			targetRing.fillAmt = hellfire.fillCap
-			hellfire.health = $+1
-			if hellfire.curRing < hellfire.maxHealth-1 then
-				hellfire.curRing = $+1
-				if healthBefore == 1 then hellfire.curRing = $-1 end --A bit janky, but it works.
-				S_StartSound(target, sfx_hfgain, ply) --Play the health ring gain sfx.
-			end
-		else
-			if targetRing.fillAmt < hellfire.fillCap-1 then --Any fillAmt below the cap will increase the fillAmt.
-				targetRing.fillAmt = $+ringsAdded
-				S_StartSound(target, sfx_hffill, ply) --Play the health ring fill sfx.
+	if not(ply.hellfireHealth.healOverride) then
+		--If there is a ring deficit, put the collected rings towards it instead.
+		if hellfire.options.doRingSpill and hellfire.ringDeficit > 0 then
+			if not(instaFill) then
+				hellfire.ringDeficit = hf.clamp($-ringsAdded, 0, FU)
+				return
 			else
-				--When fillAmt hits the cap, give a new ring.
-				targetRing.fillAmt = hellfire.fillCap
+				local leftOver = hf.clamp(hellfire.ringDeficit-ringsAdded, 0, FU)
+				if ringsAdded > hellfire.ringDeficit then leftOver = hf.clamp(ringsAdded-hellfire.ringDeficit, 0, FU) end
+				
+				hellfire.ringDeficit = hf.clamp($-ringsAdded, 0, FU)
+				
+				if leftOver < hellfire.fillCap then instaFill = false end --Remove the instafill if there isn't enough left over.
+
+				ringsAdded = leftOver --Set the ringsAdded to what's left over.
+			end
+		end
+
+		if hellfire.options.fillOnly and not(instaFill) then return end --More rings than the fill cap per tic challenge.
+
+		--Fetch the first empty ring.
+		local targetRing = hf.getRingWithState(hellfire, 0, true)
+
+		if hellfire.health < hellfire.maxHealth then --No overheal.
+			if instaFill then --Handle any ring changes above the fill cap in a tic.
 				hellfire.health = $+1
-				if hellfire.curRing < hellfire.maxHealth-1 then
-					hellfire.curRing = $+1
-					if healthBefore == 1 then hellfire.curRing = $-1 end --A bit janky, but it works.
+				S_StartSound(target, sfx_hfgain, ply) --Play the health ring gain sfx.
+			else
+				if targetRing.fillAmt < hellfire.fillCap-1 then --Any fillAmt below the cap will increase the fillAmt.
+					targetRing.fillAmt = $+ringsAdded
+					S_StartSound(target, sfx_hffill, ply) --Play the health ring fill sfx.
+				else
+					--When fillAmt hits the cap, give a new ring.
+					hellfire.health = $+1
 					S_StartSound(target, sfx_hfgain, ply) --Play the health ring gain sfx.
 				end
 			end
+			hellfire.transStuff.doFade = true
 		end
-		hellfire.transStuff.doFade = true
 	end
+
+	ply.hellfireHealth.healOverride = false
 end
 
 --The player think handler, misc. junk live here.
 local function thkHandler(ply)
+	if not(hf.objectExists(ply)) or not(hf.objectExists(ply.mo)) then return end --Don't do anything if the player or it's mobj doesn't exist.
 	local hellfire = ply.hellfireHealth
-	if objectExists(ply.mo) ~= true then return end --Don't do anything if the player mobj doesn't exist.
 
 	--Store the info on the current skin upon switch.
 	if ply.mo.skin ~= hellfire.lastSkin then
-		ply.hellfireHealth.skinInfo.isBanned = getSkinVar(ply, "isBanned")
-		ply.hellfireHealth.skinInfo.shieldHack = getSkinVar(ply, "shieldHack")
-		ply.hellfireHealth.skinInfo.deathOverride = getSkinVar(ply, "deathOverride")
-		ply.hellfireHealth.skinInfo.noDeathJingle = getSkinVar(ply, "noDeathJingle")
-		ply.hellfireHealth.skinInfo.silentLoss = getSkinVar(ply, "silentLoss")
-		ply.hellfireHealth.skinInfo.serverBanned = getSkinVar(ply, "serverBanned")
+		ply.hellfireHealth.skinInfo.isBanned = hf.getSkinVar(ply, "isBanned")
+		ply.hellfireHealth.skinInfo.shieldHack = hf.getSkinVar(ply, "shieldHack")
+		ply.hellfireHealth.skinInfo.deathOverride = hf.getSkinVar(ply, "deathOverride")
+		ply.hellfireHealth.skinInfo.noDeathJingle = hf.getSkinVar(ply, "noDeathJingle")
+		ply.hellfireHealth.skinInfo.silentLoss = hf.getSkinVar(ply, "silentLoss")
+		ply.hellfireHealth.skinInfo.serverBanned = hf.getSkinVar(ply, "serverBanned")
+
+		hellfire.allowOverride = false --Reset allow override
 	end
 	
-	--Check for any characters that mess with health OR fits the skin list.
-	if ((objectExists(ply.mo) and ply.mo.health ~= 1 and not(hellfire.isDead)) or hellfire.skinInfo.isBanned)
-	and not(hellfire.options.allowOnAllChars)
-	or (hellfire.skinInfo.serverBanned and not(hellfire.bypassServerList)) then
-		if hellfire.notAllowed == false then
-			hellfire.notAllowed = true
-		end
-	elseif G_IsSpecialStage() and not(hellfire.options.allowOnSpecialStages) then --Check if the current stage is a special stage.
-		if hellfire.notAllowed == false then
-			hellfire.notAllowed = true
-		end
-	elseif RingslingerRev ~= nil and RingslingerRev.GamemodeActive then --I'm not even going to allow the system to work when playing Ringslinger Revolution.
-		if hellfire.notAllowed == false then
-			hellfire.notAllowed = true
-		end
-	else
-		if hellfire.notAllowed == true then
-			hellfire.notAllowed = false
+	--Override for special cases.
+	if not(hellfire.allowOverride) then
+		--Check for any characters that mess with health OR fits the skin list.
+		if ((hf.objectExists(ply.mo) and ply.mo.health ~= 1 and not(hellfire.isDead)) or hellfire.skinInfo.isBanned)
+		and not(hellfire.options.allowOnAllChars)
+		or (hellfire.skinInfo.serverBanned and not(hellfire.bypassServerList)) then
+			if hellfire.notAllowed == false then
+				hellfire.notAllowed = true
+			end
+		elseif G_IsSpecialStage() and not(hellfire.options.allowOnSpecialStages) then --Check if the current stage is a special stage.
+			if hellfire.notAllowed == false then
+				hellfire.notAllowed = true
+			end
+		elseif RingslingerRev ~= nil and RingslingerRev.GamemodeActive then --I'm not even going to allow the system to work when playing Ringslinger Revolution.
+			if hellfire.notAllowed == false then
+				hellfire.notAllowed = true
+			end
+		else
+			if hellfire.notAllowed == true then
+				hellfire.notAllowed = false
+			end
 		end
 	end
 
 	if not(hellfire.notAllowed) and not(hellfire.options.disabled) then
 		if hellfire.maxHealth > 1 then --Obviously, this code can only work if there is any health to refill, since the last ring can't.
-			for i=1,#hellfire.rings do
-				--Catch anytime the fillAmt hits the cap and change their state AND trigger the flash animation.
-				if hellfire.rings[i].fillAmt == hellfire.fillCap then
-					if hellfire.rings[i].state ~= "filled" then
-						hellfire.rings[i].state = "filled"
-						hellfire.rings[i].doFlash = true
-					end
-				end
-			end
-
 			--This is where the refill handler is called, and ring difference is kept track.
 			if ply.rings ~= hellfire.lastVals.lastRingCount then
 				if ply.rings > hellfire.lastVals.lastRingCount then --ONLY on ring gain.
-					local isOverCap = (ply.rings-hellfire.lastVals.lastRingCount) >= hellfire.fillCap
-					healthRefillHandler(ply, isOverCap, (ply.rings-hellfire.lastVals.lastRingCount))
+					healthRefillHandler(ply, (ply.rings-hellfire.lastVals.lastRingCount))
 				end
 
 				ply.hellfireHealth.lastVals.lastRingCount = ply.rings
 			end
 		end
+
+		--Sometimes, too many rings get added every tick, thus breaking the refill handler.
+		--Here, we just force a check for any ring that is at the fill cap.
+		--Fetch the first empty ring.
+		local targetRing = hf.getRingWithState(hellfire, 0, true)
+
+		if targetRing ~= nil and targetRing.fillAmt > hellfire.fillCap-1 and targetRing.state ~= 1 then --This works so far... hard to test it, though.
+			--When fillAmt hits the cap, give a new ring.
+			hellfire.health = $+1
+			S_StartSound(target, sfx_hfgain, ply) --Play the health ring gain sfx.
+			hellfire.transStuff.doFade = true
+		end
+	end
+
+	if hf.canPlayerBeHurt(ply) and hellfire.tookDmg then
+		hellfire.tookDmg = false
 	end
 
 	ply.hellfireHealth.lastSkin = ply.mo.skin
 end
 
+local function ringSync(ply)
+	local hellfire = ply.hellfireHealth
+	if not(hf.objectExists(ply)) or not(hf.objectExists(ply.mo)) then return end --Don't do anything if the player or it's mobj doesn't exist.
+
+	local count, gap = hf.countRingsWithState(hellfire, 1)
+
+	if count ~= (hellfire.health-1) or gap then --Change/desync occured
+		if gap then --PANIC!
+			CONS_Printf(ply, "WARNING: A desync between your HUD and the data for your health has occured!")
+			CONS_Printf(ply, "I will attempt to fix this issue immediately.")
+
+			hf.resetRings(hellfire)
+
+			for i=#hellfire.rings,1,-1 do
+				local ring = hellfire.rings[i]
+				local lastState = ring.state
+
+				ring.state = 0
+				ring.fillAmt = 0
+				if lastState == 1 then ring.doAnim = 0 end
+
+				local newCount, newGap = hf.countRingsWithState(hellfire, 1)
+
+				if newCount == (hellfire.health-1) then break end
+			end
+
+			CONS_Printf(ply, "Please report this bug to the mod's GitHub page or discussions page with")
+			CONS_Printf(ply, "what map you were on, what character you were playing,")
+			CONS_Printf(ply, "and what mods you have loaded so we can work together to fix this issue!")
+		end
+
+		if count > (hellfire.health-1) then --Loss
+			for i=#hellfire.rings,1,-1 do
+				local ring = hellfire.rings[i]
+				local lastState = ring.state
+
+				ring.state = 0
+				ring.fillAmt = 0
+				if lastState == 1 then ring.doAnim = 0 end
+
+				local newCount, newGap = hf.countRingsWithState(hellfire, 1)
+
+				if newCount == (hellfire.health-1) then break end
+			end
+		elseif count < (hellfire.health-1) then --Gain
+			for i=1,#hellfire.rings do
+				local ring = hellfire.rings[i]
+				local lastState = ring.state
+
+				ring.state = 1
+				ring.fillAmt = hellfire.fillCap
+				if lastState == 0 then ring.doAnim = 1 end
+
+				local newCount, newGap = hf.countRingsWithState(hellfire, 1)
+
+				if newCount == (hellfire.health-1) then break end
+			end
+		end
+	end
+end
+
 addHook("PlayerSpawn", initHellfire)
 addHook("PlayerThink", thkHandler)
+addHook("PlayerThink", ringSync)
 addHook("MobjDamage", dmgHandler, MT_PLAYER)
 addHook("MobjDeath", deathHandler, MT_PLAYER)
+
+--Bot respawn fix--
+addHook("PlayerThink", function(bot)
+	if hf.objectExists(bot) ~= true and hf.objectExists(bot.mo) ~= true then return end --Non-valid checker
+	if CV_FindVar("hellfire_botEnable").value == 0 then return end --Don't execute for bots if not allowed.
+	if bot.bot == 0 then return end --Bots only
+
+	local hellfire = bot.hellfireHealth
+
+	if hellfire.health == 0 then --Bot died.
+		if bot.playerstate == 0 then --Wait for when the bot respawns.
+			initHellfire(bot)
+		end
+	end
+end)
