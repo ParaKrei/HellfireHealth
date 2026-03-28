@@ -886,6 +886,39 @@ hf["directDmg"] = function(ply, dmg, args)
 		end
 	end
 end
+--Just the loss code separated; don't use this unless neccessary.
+hf["directLoss"] = function(ply)
+	local hellfire = ply.hellfireHealth
+
+	--Do the multiplayer burst stuff.
+	P_PlayerEmeraldBurst(ply)
+	P_PlayerWeaponPanelOrAmmoBurst(ply)
+	P_PlayerFlagBurst(ply)
+
+	--Ring code (spills and subtractions).
+	if hellfire.options.doRingSpill then
+		local subtractRingAmt = 2*((hellfire.maxHealth-hellfire.health)+1)
+		local newRingCount = ply.rings-subtractRingAmt
+
+		if newRingCount > 0 then
+			P_PlayerRingBurst(ply, subtractRingAmt)
+			ply.rings = newRingCount
+		else
+			newRingCount = subtractRingAmt+(ply.rings-subtractRingAmt)
+			P_PlayerRingBurst(ply, newRingCount)
+			ply.rings = 0
+		end
+
+		hellfire.ringDeficit = subtractRingAmt
+	else
+		--No ring spill? You just lose rings, then.
+		if ply.rings-2*((hellfire.maxHealth-hellfire.health)+1) < 0 then --No negatives.
+			ply.rings = 0
+		else
+			ply.rings = $-2*((hellfire.maxHealth-hellfire.health)+1)
+		end
+	end
+end
 --Health ring progress remover function for mappers.
 hf["directProgressWipe"] = function(ply)
 	local hellfire = ply.hellfireHealth

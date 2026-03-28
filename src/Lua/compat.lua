@@ -179,24 +179,26 @@ end, MT_RING)
 --Let the HP take the hit.
 if not(rawget(_G, "MT_SONICEXE")) then freeslot("MT_SONICEXE") end --I need the MOBJ type, so I'll attempt to use the method 2011x uses.
 if not(rawget(_G, "S_EXERUN")) then freeslot("S_EXERUN") end --I need this state too.
-if not(rawget(_G, "S_EXEFALL")) then freeslot("S_EXEFALL") end --I need this state too.
+if not(rawget(_G, "S_EXEPAIN")) then freeslot("S_EXEPAIN") end --I need this state too.
+
 addHook("PlayerThink", function(ply)
-	if activeexe == nil then return end --Can't do anything if 2011x doesn't exist!
+	if exe_active == nil and activeexe == nil then return end --Can't do anything if 2011x doesn't exist!
 	if ply.hellfireHealth == nil then return end --Can't do anything yet...
 	if ply.hellfireHealth.options.disabled then return end --Don't do ANYTHING if the player doesn't want the system.
 	if CV_FindVar("hellfire_2011x").value == 0 then return end --Server disabled compatibility!
 
 	--Setup variables for easy access.
-	local X = activeexe
+	local X = exe_active or activeexe
 	local hellfire = ply.hellfireHealth
+
 	if hellfire.X == nil then hellfire.X = {} end --Set up compat table.
 
 	if X ~= 0 and hf.objectExists(X) and not(hellfire.notAllowed) then
 		if X.target == ply.mo and X.gotcha then
 			if not X.killplayer then --He's going to KILL me!
 				if hellfire.health > 1 then --Only do stuff if the player has MORE than 1 HP.
-					--Stop him from killing the player and damage the player's HP instead.
-					hf.directDmg(ply, 1)
+					--Stop him from killing the player and damage the player's HP/hurt the player normally instead.
+					if CV_FindVar("exe_grabdamage") ~= nil then P_DamageMobj(ply.mo, X, X) else hf.directDmg(ply, 1) end --Using DamageMobj for newer versions to damage shields.
 
 					P_DamageMobj(X, ply.mo, ply.mo) --B**CH-SLAP!
 				end
@@ -220,12 +222,13 @@ addHook("TouchSpecial", function(X, obj)
 
 		if obj ~= X.target then return true end --Don't do anything if that obj isn't X's target.
 
-		if not(hellfire.notAllowed) and exerage then
+		if not(hellfire.notAllowed) and (exerage or exe_ragetime) then
 			if X.state == S_EXERUN then
 				if hellfire.health == 1 and ply.powers[pw_shield] == SH_NONE then --X will always grab you if you have no shield and have one health remaining.
 					if ply.rings ~= 0 then
 						hellfire.X.lastRings = ply.rings --Store the player's rings, as we'll get rid of them this tick, and restore it next tick.
 						ply.rings = 0
+						hellfire.lastRingCount = 0
 					end
 				else
 					if not(X.melee) then X.melee = 1 end
@@ -234,8 +237,48 @@ addHook("TouchSpecial", function(X, obj)
 				if hellfire.health == 1 and ply.powers[pw_shield] == SH_NONE and X.gotcha then
 					if ply.rings == 0 and hellfire.X.lastRings ~= nil then
 						ply.rings = hellfire.X.lastRings
-						hellfire.lastRingCount = ply.rings
-						hellfire.healOverride = true
+						hellfire.lastRingCount = hellfire.X.lastRings-1
+						hellfire.X.lastRings = nil
+					end
+				end
+			end
+		end
+	end
+end, MT_SONICEXE)
+--New TouchSpecial hook for the new grab damage stuff, since X can just kill you with that now.
+addHook("TouchSpecial", function(X, obj)
+	if CV_FindVar("hellfire_2011x").value == 0 then return end --Server disabled compatibility!
+	if CV_FindVar("exe_grabdamage") == nil or (CV_FindVar("exe_grabdamage") ~= nil and not(CV_FindVar("exe_grabdamage").value)) then return end --Grab damage is either disabled or this version of 2011x doesn't have it!
+
+	if (hf.objectExists(X) and X.health)
+	and (hf.objectExists(obj) and hf.objectExists(obj.player) and obj.player.playerstate == PST_LIVE) then
+		local ply = obj.player
+		local hellfire = ply.hellfireHealth
+
+		if obj ~= X.target then return true end --Don't do anything if that obj isn't X's target.
+
+		if not(hellfire.notAllowed) and not(exerage or exe_ragetime) then
+			if X.state == S_EXEPAIN and not(X.parrywindow) then
+				if hellfire.health > 1 and ply.powers[pw_shield] == SH_NONE then --ALWAYS damage the player if they're above 1 HP.
+					if ply.rings == 0 and hf.canPlayerBeHurt(ply) then --Give the player a ring to hurt them.
+						ply.rings = 1
+						hellfire.lastRingCount = 1
+					end
+				elseif hellfire.health == 1 and ply.powers[pw_shield] == SH_NONE then --Don't let X kill the player if they are at 1 HP.
+					if hf.canPlayerBeHurt(ply) then
+						if ply.rings ~= 0 then
+							hellfire.X.lastRings = ply.rings --Store the player's rings, as we'll get rid of them this tick, and restore it next tick.
+							ply.rings = 0
+							hellfire.lastRingCount = 0
+						end
+					else
+						if ply.rings == 0 and hellfire.X.lastRings ~= nil then
+							ply.rings = hellfire.X.lastRings
+							hellfire.lastRingCount = hellfire.X.lastRings-1
+							hellfire.X.lastRings = nil
+							hf.directLoss(ply)
+							hf.directProgressWipe(ply)
+						end
 					end
 				end
 			end
@@ -308,7 +351,9 @@ addHook("ShouldDamage", function(target, cause, src, dmg, dmgType)
 			if ply.pflags & PF_GODMODE then return end --Bypass for GODMODE.
 			if dmgType & DMG_DEATHMASK then return end --Bypass for DEATHMASK.
 
-			if hellfire.health > 1 then
+			if ply.powers[pw_shield] ~= SH_NONE then --Don't want to forget the shield!
+				return true
+			elseif hellfire.health > 1 then
 				if (hf.objectExists(echoes.voidorb) or echoes.twirltimer > 0)
 				and echoes.stuncooldown <= 0 then
 					if not(hellfire.echoes.sndPlayed) then
@@ -558,3 +603,33 @@ addHook("PostThinkFrame", function()
 		end
 	end
 end)
+
+--Legacy Cream--
+--HP first, then Cheese.
+--Fake DamageMobj to avoid killing Cheese.
+addHook("ShouldDamage", function(target, cause, src, dmg, dmgType)
+	if hf.objectExists(target) and hf.objectExists(target.player)
+	and hf.objectExists(target.player.cheese)
+	and target.skin == "cream" then
+		--Setup variables for easy access.
+		local ply = target.player
+		local hellfire = ply.hellfireHealth
+
+		if hellfire ~= nil and not(hellfire.notAllowed) and not(hellfire.options.disabled) then
+			if not(hf.canPlayerBeHurt(ply)) then return end --Bypass if player can't be hurt.
+			if ply.spectator then return end --Bypass for spectators.
+			if ply.pflags & PF_GODMODE then return end --Bypass for GODMODE.
+			if dmgType & DMG_DEATHMASK then return end --Bypass for DEATHMASK.
+
+			if ply.powers[pw_shield] ~= SH_NONE then --Don't want to forget the shield!
+				return true
+			elseif hellfire.health > 1 then
+				hf.directDmg(ply, 1, {forceSound=true})
+				
+				return false
+			else
+				hellfire.dmgOverride = true
+			end
+		end
+	end
+end, MT_PLAYER)

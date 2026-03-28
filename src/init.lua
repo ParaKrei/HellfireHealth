@@ -14,7 +14,8 @@
 
 --[[
 	TODO:
-	Implement alignment types (left, right, top, and bottom) via a flag-like system. [Low-priority, might be 3.1]
+	Fallback system for all client files that deletes the files and makes new ones; to catch any weird errors [Low-priority, might be 3.1].
+	Implement alignment types (left, right, top, and bottom) via a flag-like system [Low-priority, might be 3.1].
 ]]
 
 --Create global object to hold everything--
