@@ -15,3 +15,6 @@ This mod also comes packed with a fix to NiGHTS stages to prevent soft-locks whe
 | **BattleMod** | https://mb.srb2.org/addons/srb2-battle-multiplayer-gameplay-mod.171/ ***OR*** https://mb.srb2.org/addons/battle-mod-jab-edition.5458/ | Blocks, shields, and hurt messages function properly (This is important, due to how Hellfire Health and BattleMod handles damage)! |
 | **Metroid Vanguard** | https://mb.srb2.org/addons/metroid-vanguard-samus-aran-in-srb2-v1-4.2666/ | Non-Samus players now have a better chance of survival against the mod's unique forms of damage, as the health rings will take the damage for you! (Hint: If something ever latches onto you, spin dash or move really fast)! |
 | **Legacy Cream** | **NOT PUBLICLY RELEASED YET; CAN BE FOUND ON SAOSHI'S MODDED PLANET** | If allowed, Cream will use Hellfire Health just like Doomguy and Takis. |
+
+***I don't own any of the characters above, nor made their mod for "Sonic Robo Blast 2".
+If the creators of any of these mods don't want compatibility implemented in "Hellfire Health", please contact me on the "Sonic Robo Blast 2 Message Board" and I'll reply as soon as possible.***
