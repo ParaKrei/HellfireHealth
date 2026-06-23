@@ -195,7 +195,7 @@ addHook("PlayerThink", function(ply)
 
 	if X ~= 0 and hf.objectExists(X) and not(hellfire.notAllowed) then
 		if X.target == ply.mo and X.gotcha then
-			if not X.killplayer then --He's going to KILL me!
+			if not X.killplayer or X.messedup >= 2 then --He's going to KILL me!
 				if hellfire.health > 1 then --Only do stuff if the player has MORE than 1 HP.
 					--Stop him from killing the player and damage the player's HP/hurt the player normally instead.
 					if CV_FindVar("exe_grabdamage") ~= nil then P_DamageMobj(ply.mo, X, X) else hf.directDmg(ply, 1) end --Using DamageMobj for newer versions to damage shields.
@@ -222,7 +222,7 @@ addHook("TouchSpecial", function(X, obj)
 
 		if obj ~= X.target then return true end --Don't do anything if that obj isn't X's target.
 
-		if not(hellfire.notAllowed) and (exerage or exe_ragetime) then
+		if not(hellfire.notAllowed) and (exerage or exe_ragetime or CV_FindVar("exe_ordinarymode").value == 1) then
 			if X.state == S_EXERUN then
 				if hellfire.health == 1 and ply.powers[pw_shield] == SH_NONE then --X will always grab you if you have no shield and have one health remaining.
 					if ply.rings ~= 0 then
