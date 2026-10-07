@@ -9,7 +9,7 @@
 		"lua": true //The mod uses Lua.
 	},
 	"SRB2Project.executable": "/mnt/2TBDrive/Games/Fan Games/SRB2/SRB2_Flatpak.sh", //Set this to the path of your game's executable.
-	"SRB2Project.test_path": "/mnt/2TBDrive/Games/Fan Games/SRB2/data/.srb2/addons/TESTING/characters", //Set this to where you want the TEST version of the mod to go.
-	"SRB2Project.final_path": "/mnt/2TBDrive/Games/Fan Games/SRB2/data/.srb2/addons/characters", //Set this to where you want the FINAL version of the mod to go.
+	"SRB2Project.test_path": "/mnt/2TBDrive/Games/Fan Games/SRB2/data/.srb2/addons/TESTING/others", //Set this to where you want the TEST version of the mod to go.
+	"SRB2Project.final_path": "/mnt/2TBDrive/Games/Fan Games/SRB2/data/.srb2/addons/gameplay", //Set this to where you want the FINAL version of the mod to go.
 	"SRB2Project.test_suffix": "dev" //Set this to the version suffix you want test versions to have.
 }
