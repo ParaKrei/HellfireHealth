@@ -1,0 +1,220 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Create final build",
+			"detail": "Make a new final build of your mod!",
+			"type": "shell",
+			"command": [
+				"pwsh build.ps1",
+				"-modName ${config:SRB2Project.mod_name} -suffix v${input:version}",
+				"-s ${config:SRB2Project.metadata.campaign}",
+				"-r ${config:SRB2Project.metadata.race}",
+				"-m ${config:SRB2Project.metadata.match}",
+				"-f ${config:SRB2Project.metadata.ctf}",
+				"-c ${config:SRB2Project.metadata.character}",
+				"-l ${config:SRB2Project.metadata.lua}",
+				"-gameExe '${config:SRB2Project.executable}'",
+				"-exportPath '${config:SRB2Project.final_path}'",
+				"-pathSave '.paths${/}finalPath.txt'"
+			],
+			"problemMatcher": [],
+			"group": {
+				"kind": "build"
+			}
+		},
+		{
+			"label": "Create test build",
+			"detail": "Make a new test build of your mod!",
+			"type": "shell",
+			"command": [
+				"pwsh build.ps1",
+				"-modName ${config:SRB2Project.mod_name} -suffix ${config:SRB2Project.test_suffix}",
+				"-s ${config:SRB2Project.metadata.campaign}",
+				"-r ${config:SRB2Project.metadata.race}",
+				"-m ${config:SRB2Project.metadata.match}",
+				"-f ${config:SRB2Project.metadata.ctf}",
+				"-c ${config:SRB2Project.metadata.character}",
+				"-l ${config:SRB2Project.metadata.lua}",
+				"-exportPath '${config:SRB2Project.test_path}'",
+				"-pathSave '.paths${/}testPath.txt'"
+			],
+			"problemMatcher": [],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "Run final build",
+			"detail": "Run the test build of your mod!",
+			"type": "shell",
+			"command": [
+				"pwsh test.ps1",
+				"-gameExe '${config:SRB2Project.executable}'",
+				"-pathFile '.paths${/}finalPath.txt'",
+				"-mods VS_Srb2Station-v1.2.2.wad",
+				"-mapName map69",
+				"-targetSkin skeleton"
+			],
+			"problemMatcher": [],
+			"group": {
+				"kind": "test"
+			}
+		},
+		{
+			"label": "Run test build",
+			"detail": "Run the test build of your mod!",
+			"type": "shell",
+			"command": [
+				"pwsh test.ps1",
+				"-gameExe '${config:SRB2Project.executable}'",
+				"-pathFile '.paths${/}testPath.txt'",
+				"-mods VS_Srb2Station-v1.2.2.wad",
+				"-mapName map69",
+				"-targetSkin skeleton"
+			],
+			"problemMatcher": [],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "Test with Metroid Vanguard",
+			"detail": "Test it with Samus!",
+			"type": "shell",
+			"command": [
+				"pwsh test.ps1",
+				"-gameExe '${config:SRB2Project.executable}'",
+				"-pathFile '.paths${/}testPath.txt'",
+				"-mods SMCL_Samus-v1.5d.pk3 L_AdminToolsPlus_v1.2.lua",
+				"-mapName map01",
+				"-targetSkin skeleton"
+			],
+			"problemMatcher": [],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "Test with 2011x",
+			"detail": "Test it with 2011x!",
+			"type": "shell",
+			"command": [
+				"pwsh test.ps1",
+				"-gameExe '${config:SRB2Project.executable}'",
+				"-pathFile '.paths${/}testPath.txt'",
+				"-mods L_2011x-v1.6.0.1.pk3",
+				"-mapName map01",
+				"-targetSkin skeleton"
+			],
+			"problemMatcher": [],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "Test with Battle",
+			"detail": "Test it with Battle!",
+			"type": "shell",
+			"command": [
+				"pwsh test.ps1",
+				"-gameExe '${config:SRB2Project.executable}'",
+				"-pathFile '.paths${/}testPath.txt'",
+				"-mods ZBa_BattleMod-v9.3.pk3",
+				"-otherArgs '-server -gametype Arena'",
+				"-mapName MAPB0",
+				"-targetSkin skeleton"
+			],
+			"problemMatcher": [],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "Test with Hellfire Health",
+			"detail": "Test it with Hellfire Health!",
+			"type": "shell",
+			"command": [
+				"pwsh test.ps1",
+				"-gameExe '${config:SRB2Project.executable}'",
+				"-pathFile '.paths${/}testPath.txt'",
+				"-mods L_HellfireHealth-v3.1.1.pk3",
+				"-mapName map01",
+				"-targetSkin skeleton"
+			],
+			"problemMatcher": [],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "Test with Knuckles Rematch",
+			"detail": "Test it with Knuckles Rematch!",
+			"type": "shell",
+			"command": [
+				"pwsh test.ps1",
+				"-gameExe '${config:SRB2Project.executable}'",
+				"-pathFile '.paths${/}testPath.txt'",
+				"-mods SL_TrueArena-v3.4.pk3",
+				"-mapName maprb",
+				"-targetSkin skeleton"
+			],
+			"problemMatcher": [],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "Test with Ringslinger",
+			"detail": "Test it with Ringslinger+RailAI!",
+			"type": "shell",
+			"command": [
+				"pwsh test.ps1",
+				"-gameExe '${config:SRB2Project.executable}'",
+				"-pathFile '.paths${/}testPath.txt'",
+				"-mods L_RailAI_V1.05.pk3",
+				"-otherArgs '-server -gametype 3'",
+				"-mapName MAPM0",
+				"-targetSkin skeleton"
+			],
+			"problemMatcher": [],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "Test with Special Minigames",
+			"detail": "Test it with Special Minigames!",
+			"type": "shell",
+			"command": [
+				"pwsh test.ps1",
+				"-gameExe '${config:SRB2Project.executable}'",
+				"-pathFile '.paths${/}testPath.txt'",
+				"-mods S_SpecialMinigames-V1.2.pk3",
+				"-mapName map61",
+				"-targetSkin skeleton"
+			],
+			"problemMatcher": [],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
+		}
+	],
+	"inputs": [
+		{
+			"id": "version",
+			"type": "promptString",
+			"description": "Set the version number of the mod; please follow semantic versioning!",
+			"default": "1"
+		}
+	]
+}

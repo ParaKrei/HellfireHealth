@@ -181,6 +181,23 @@ if not(rawget(_G, "MT_SONICEXE")) then freeslot("MT_SONICEXE") end --I need the 
 if not(rawget(_G, "S_EXERUN")) then freeslot("S_EXERUN") end --I need this state too.
 if not(rawget(_G, "S_EXEPAIN")) then freeslot("S_EXEPAIN") end --I need this state too.
 
+--Since MobjCollide is too slow to do any changes, I have to directly modify EXE_WouldDie do get the old functionality back.
+--This method should also be more consistant and keep working every update.
+--I don't really like having to modify a function like this, but I didn't have much of a choice.
+addHook("MapLoad", function()
+	local func_super = rawget(_G, "EXE_WouldDie")
+	rawset(_G, "EXE_WouldDie", function(target)
+		local ply = target.player
+		local hellfire = ply.hellfireHealth
+
+		if not(ply.hellfireHealth == nil or ply.hellfireHealth.options.disabled or CV_FindVar("hellfire_2011x").value == 0) then
+			if hellfire.health == 1 and ply.powers[pw_shield] == SH_NONE then return true else return false end
+		end
+
+		func_super(target)
+	end)
+end)
+
 addHook("PlayerThink", function(ply)
 	if exe_active == nil and activeexe == nil then return end --Can't do anything if 2011x doesn't exist!
 	if ply.hellfireHealth == nil then return end --Can't do anything yet...
@@ -200,7 +217,7 @@ addHook("PlayerThink", function(ply)
 					--Stop him from killing the player and damage the player's HP/hurt the player normally instead.
 					if CV_FindVar("exe_grabdamage") ~= nil then P_DamageMobj(ply.mo, X, X) else hf.directDmg(ply, 1) end --Using DamageMobj for newer versions to damage shields.
 
-					P_DamageMobj(X, ply.mo, ply.mo) --B**CH-SLAP!
+					P_DamageMobj(X, ply.mo, ply.mo) --Slap him. Slap him really hard.
 				end
 			elseif X.killplayer <= 10 then --Little animation on the ring for feedback.
 				if hellfire.health > 1 then --Only do stuff if the player has MORE than 1 HP.
@@ -211,80 +228,6 @@ addHook("PlayerThink", function(ply)
 		end
 	end
 end)
---X doesn't care if you have invisibility when attacking you, if he can touch you, he WILL attack.
-addHook("TouchSpecial", function(X, obj)
-	if CV_FindVar("hellfire_2011x").value == 0 then return end --Server disabled compatibility!
-
-	if (hf.objectExists(X) and X.health)
-	and (hf.objectExists(obj) and hf.objectExists(obj.player) and obj.player.playerstate == PST_LIVE) then
-		local ply = obj.player
-		local hellfire = ply.hellfireHealth
-
-		if obj ~= X.target then return true end --Don't do anything if that obj isn't X's target.
-
-		if not(hellfire.notAllowed) and (exerage or exe_ragetime or CV_FindVar("exe_ordinarymode").value == 1) then
-			if X.state == S_EXERUN then
-				if hellfire.health == 1 and ply.powers[pw_shield] == SH_NONE then --X will always grab you if you have no shield and have one health remaining.
-					if ply.rings ~= 0 then
-						hellfire.X.lastRings = ply.rings --Store the player's rings, as we'll get rid of them this tick, and restore it next tick.
-						ply.rings = 0
-						hellfire.lastRingCount = 0
-					end
-				else
-					if not(X.melee) then X.melee = 1 end
-				end
-			else
-				if hellfire.health == 1 and ply.powers[pw_shield] == SH_NONE and X.gotcha then
-					if ply.rings == 0 and hellfire.X.lastRings ~= nil then
-						ply.rings = hellfire.X.lastRings
-						hellfire.lastRingCount = hellfire.X.lastRings-1
-						hellfire.X.lastRings = nil
-					end
-				end
-			end
-		end
-	end
-end, MT_SONICEXE)
---New TouchSpecial hook for the new grab damage stuff, since X can just kill you with that now.
-addHook("TouchSpecial", function(X, obj)
-	if CV_FindVar("hellfire_2011x").value == 0 then return end --Server disabled compatibility!
-	if CV_FindVar("exe_grabdamage") == nil or (CV_FindVar("exe_grabdamage") ~= nil and not(CV_FindVar("exe_grabdamage").value)) then return end --Grab damage is either disabled or this version of 2011x doesn't have it!
-
-	if (hf.objectExists(X) and X.health)
-	and (hf.objectExists(obj) and hf.objectExists(obj.player) and obj.player.playerstate == PST_LIVE) then
-		local ply = obj.player
-		local hellfire = ply.hellfireHealth
-
-		if obj ~= X.target then return true end --Don't do anything if that obj isn't X's target.
-
-		if not(hellfire.notAllowed) and not(exerage or exe_ragetime) then
-			if X.state == S_EXEPAIN and not(X.parrywindow) then
-				if hellfire.health > 1 and ply.powers[pw_shield] == SH_NONE then --ALWAYS damage the player if they're above 1 HP.
-					if ply.rings == 0 and hf.canPlayerBeHurt(ply) then --Give the player a ring to hurt them.
-						ply.rings = 1
-						hellfire.lastRingCount = 1
-					end
-				elseif hellfire.health == 1 and ply.powers[pw_shield] == SH_NONE then --Don't let X kill the player if they are at 1 HP.
-					if hf.canPlayerBeHurt(ply) then
-						if ply.rings ~= 0 then
-							hellfire.X.lastRings = ply.rings --Store the player's rings, as we'll get rid of them this tick, and restore it next tick.
-							ply.rings = 0
-							hellfire.lastRingCount = 0
-						end
-					else
-						if ply.rings == 0 and hellfire.X.lastRings ~= nil then
-							ply.rings = hellfire.X.lastRings
-							hellfire.lastRingCount = hellfire.X.lastRings-1
-							hellfire.X.lastRings = nil
-							hf.directLoss(ply)
-							hf.directProgressWipe(ply)
-						end
-					end
-				end
-			end
-		end
-	end
-end, MT_SONICEXE)
 
 --[[Characters]]--
 --TAG TEAM (Silverhorn)--
