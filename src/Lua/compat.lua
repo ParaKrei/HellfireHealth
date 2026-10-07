@@ -181,6 +181,10 @@ if not(rawget(_G, "MT_SONICEXE")) then freeslot("MT_SONICEXE") end --I need the 
 if not(rawget(_G, "S_EXERUN")) then freeslot("S_EXERUN") end --I need this state too.
 if not(rawget(_G, "S_EXEPAIN")) then freeslot("S_EXEPAIN") end --I need this state too.
 
+rawset(_G, "TestFunction", function()
+	print("this is the original print")
+end)
+
 --Since MobjCollide is too slow to do any changes, I have to directly modify EXE_WouldDie do get the old functionality back.
 --This method should also be more consistant and keep working every update.
 --I don't really like having to modify a function like this, but I didn't have much of a choice.
@@ -190,11 +194,11 @@ addHook("MapLoad", function()
 		local ply = target.player
 		local hellfire = ply.hellfireHealth
 
-		if not(ply.hellfireHealth == nil or ply.hellfireHealth.options.disabled or CV_FindVar("hellfire_2011x").value == 0) then
+		if hellfire ~= nil and not(hellfire.options.disabled) and CV_FindVar("hellfire_2011x").value == 1 then
 			if hellfire.health == 1 and ply.powers[pw_shield] == SH_NONE then return true else return false end
 		end
 
-		func_super(target)
+		return func_super(target)
 	end)
 end)
 
